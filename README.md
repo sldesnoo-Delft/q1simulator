@@ -86,10 +86,10 @@ the simulator and mimic behavior of the device:
 All other parameters only print the passed value.
 
 # Simulator output
-The simulator has two methods to show the simulator output.
+The simulator has some methods to show the simulator output.
 - `plot()` shows pyplot charts with the rendered output.
-- `print_acquisitions()` prints the path0 and path1 data and
-  the avg_cnt.
+- `print_acquisitions()` prints the path0 and path1 data and average counts.
+- `print_registers()` prints the contents of the Q1 registers.
 
 
 # About Q1Simulator
