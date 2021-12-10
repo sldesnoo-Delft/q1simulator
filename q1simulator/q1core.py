@@ -122,15 +122,22 @@ class Q1Core:
                     raise Abort('Core cycle limited exceeded',
                                 'FORCED STOP')
         except Halt:
-            msg = 'stopped'
+            rt_time_us = self.renderer.time / 1000
+            print(f'{self.name}: stopped ({cntr} cycles, {rt_time_us:7.3f} us)')
         except Illegal as ex:
-            msg = f'*** Illegal instruction at line {self.iptr}: {ex} ***'
+            msg = f'Illegal instruction at line {self.iptr}: {ex}'
+            self._print_error_msg(msg, instr, cntr)
             self._error('SEQUENCE PROCESSOR Q1 ILLEGAL INSTRUCTION')
         except Abort as ex:
-            msg = f'*** Execution aborted: {ex.args[0]} ***'
+            msg = f'Execution aborted: {ex.args[0]}'
+            self._print_error_msg(msg, instr, cntr)
             self._error(ex.args[1])
+
+    def _print_error_msg(self, msg, instr, cntr):
+        last_line = self.lines[instr.text_line_nr]
         rt_time_us = self.renderer.time / 1000
-        print(f'{self.name}: {msg} ({cntr} cycles, {rt_time_us:7.3f} us)')
+        print(f'*** {self.name}: {msg} ({cntr} cycles, {rt_time_us:7.3f} us)')
+        print(f'*** Last instruction: {last_line}')
 
     def _error(self, msg):
         self.errors.add(msg)
