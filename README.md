@@ -94,6 +94,22 @@ The simulator has some methods to show the simulator output.
 - `print_acquisitions()` prints the path0 and path1 data and average counts.
 - `print_registers()` prints the contents of the Q1 registers.
 
+# Simulator logging
+Q1Simulator has a logging feature to help with code debugging.
+It uses of special comment line in the Q1ASM code.
+The comment line should start with `#Q1Sim:` and is followed by the
+simulator log command with the format log "message",register,options.
+The options are:
+* R: log register value
+* T: log q1 and real-time executer time.
+* F: format register value as Q1Pulse float
+
+Example:
+    #Q1Sim: log "t_wait",R3,TR
+          wait  R3
+Output:
+    t_wait:          12 (0000000C) q1:   324 rt: 908 ns
+    t_wait:          80 (00000050) q1:   588 rt: 1128 ns
 
 # About Q1Simulator
 One day after I had been working on the generation of Q1ASM I thought

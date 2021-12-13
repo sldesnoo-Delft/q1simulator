@@ -63,17 +63,13 @@ class Q1Core:
 
         instr = []
         for i,line in enumerate(lines):
-            label, mnemonic, args = self.parseline(line)
+            label, mnemonic, arglist = self.parseline(line)
             if label:
                 icnt = len(instr)
                 # print(f'label {label}:{icnt}')
                 labels[label] = icnt
             if not mnemonic:
                 continue
-            if args:
-                arglist = args.split(',')
-            else:
-                arglist = []
             instr.append(Instruction(i, mnemonic, arglist, label))
 
         self.labels = labels
@@ -84,6 +80,8 @@ class Q1Core:
         org_line = line
         label_pattern = r'(\w+:)'
         instr_pattern = r'(\w+:)?\s*(\w+)\s*(.*)'
+        if line.startswith('#Q1Sim:'):
+            return self._parse_simcmd(line[7:])
         try:
             end = line.index('#')
             line = line[:end]
@@ -104,8 +102,29 @@ class Q1Core:
             label = match.group(1)
             if label:
                 label = label[:-1]
-            return [label, match.group(2), match.group(3).strip()]
+            args = match.group(3).strip()
+            if args:
+                arglist = args.split(',')
+            else:
+                arglist = []
+            return [label, match.group(2), arglist]
         raise Exception(f'{self.name}: Parse error on line: {org_line}')
+
+    def _parse_simcmd(self, command):
+        command = command.strip()
+        # format: 'log "msg",register,options
+        log_pattern = r'log "(.*)",(R\d+)?,(\w+)?'
+        re.fullmatch(log_pattern, command)
+        match = re.fullmatch(log_pattern, command)
+        if match:
+            msg = match.group(1)
+            register = match.group(2)
+            options = match.group(3)
+            if msg is None:
+                msg = ''
+            return None,'log',(msg,register,options)
+        print(f'Unknown simulator command:{command}')
+        return None,None,None
 
     def run(self):
         self.errors = set()
@@ -212,7 +231,7 @@ class Q1Core:
             value = self.R[reg_nr]
             signed_value = ((value + 0x8000_0000) & 0xFFFF_FFFF) - 0x8000_0000
             float_value = signed_value / 2**31
-            print(f'R{reg_nr:02}: {value:08X} {signed_value:10}  ({float_value:9.6f})')
+            print(f'R{reg_nr:02}: {value:08X} {signed_value:11}  ({float_value:9.6f})')
 
     # === Below are Q1ASM opcode mnemonics with _ prefix.
 
@@ -370,6 +389,26 @@ class Q1Core:
     @evaluate_args('IR')
     def _sw_req(self, value):
         raise NotImplementedError()
+
+    # ---- Simulator commands ----
+
+    def _log(self, msg, reg, options):
+        if 'R' in options and reg.startswith('R'):
+            reg_nr = int(reg[1:])
+            value = self.R[reg_nr]
+            signed_value = ((value + 0x8000_0000) & 0xFFFF_FFFF) - 0x8000_0000
+            float_value = signed_value / 2**31
+            if 'F' in options:
+                value_str = f'{float_value:9.6f} ({value:08X})'
+            else:
+                value_str = f'{signed_value:11} ({value:08X})'
+        else:
+            value_str = ''
+
+        time_str = ''
+        if 'T' in options:
+            time_str = f' q1:{self.clock.core_time:6} rt: {self.renderer.time} ns'
+        print(f'{msg}: {value_str}{time_str}')
 
 
 class CoreClock:
