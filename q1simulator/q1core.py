@@ -113,7 +113,7 @@ class Q1Core:
     def _parse_simcmd(self, command):
         command = command.strip()
         # format: 'log "msg",register,options
-        log_pattern = r'log "(.*)",(R\d+)?,(\w+)?'
+        log_pattern = r'log "(.*)",(\w+)?,(\w+)?'
         re.fullmatch(log_pattern, command)
         match = re.fullmatch(log_pattern, command)
         if match:
@@ -407,7 +407,7 @@ class Q1Core:
 
         time_str = ''
         if 'T' in options:
-            time_str = f' q1:{self.clock.core_time:6} rt: {self.renderer.time} ns'
+            time_str = f' q1:{self.clock.core_time:6} rt:{self.renderer.time:6} ns'
         print(f'{msg}: {value_str}{time_str}')
 
 

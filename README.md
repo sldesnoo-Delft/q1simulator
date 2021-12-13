@@ -108,11 +108,13 @@ Example:
 
     #Q1Sim: log "t_wait",R3,TR
           wait  R3
+    #Q1Sim: log "after",none,T
 
 Output:
 
-    t_wait:          12 (0000000C) q1:   324 rt: 908 ns
-    t_wait:          80 (00000050) q1:   588 rt: 1128 ns
+    t_wait:          12 (0000000C) q1:   324 rt:   908 ns
+    after:  q1:   332 rt:   920 ns
+
 
 # About Q1Simulator
 One day after I had been working on the generation of Q1ASM I thought
