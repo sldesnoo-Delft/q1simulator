@@ -198,7 +198,7 @@ class Q1Core:
                 args[i] = int(arg)
 
         if not allow_imm and select_imm:
-            raise AsmSyntaxError('Combination of operands not support')
+            raise AsmSyntaxError('Combination of operands not supported')
         return args
 
     def _set_register(self, reg_nr, value):
