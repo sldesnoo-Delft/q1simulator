@@ -11,13 +11,16 @@ Q1ASM program and waveforms can be uploaded to the sequencer.
 When the sequencer is started it executes the Q1ASM instructions
 and renders the output to a numpy array with DAC output values.
 
-The acquire instructions store the timestamp of the real-time
+The `acquire` instructions store the timestamp of the real-time
 executor in the path data and increments the avg_cnt.
 This makes it easy to check the timing of the acquire instructions.
 The acquire instructions also check the time between the triggers
 and report an error when there would be an FIFO error.
 
 The complete Q1ASM instruction set has been implemented.
+Q1Simulator simulates the (estimated) execution time of Q1ASM and
+uses buffer between Q1Core and real-time executor. It aborts execution
+when the real-time buffer would have an underrun.
 The renderer uses the uploaded waveforms and the nco frequency.
 
 # Example
@@ -51,7 +54,7 @@ and plots and prints the results.
 
 See demo directory for some examples.
 
-# Simulator limits
+# Simulator rendering limits
 The maximum length of the rendered output is limited to 2 ms,
 because plots with more points do not perform well.
 The maximum number of execution cycles is limited to 1e7,
@@ -102,7 +105,7 @@ generated signal. The next day I started to use Q1Simulator to
 check the code I generated with Q1Pulse and pulselib. I found
 several bugs in the generated code and in Q1Simulator.
 
-Q1Simulator evoluated into a useful tool.
+Q1Simulator evolved into a useful tool.
 Now it is available to all.
 
 *Sander de Snoo*
