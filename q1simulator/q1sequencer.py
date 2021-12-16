@@ -68,6 +68,7 @@ class Q1Sequencer:
         elif name == 'mod_en_awg':
             self._mod_en_awg = value
         elif name == 'nco_freq':
+            print(f'{self.name}: {name}={value}')
             self._nco_freq = value
         elif name == 'demod_en_acq':
             self._demod_en_acq = value
