@@ -1,3 +1,4 @@
+import logging
 from functools import partial
 import json
 import numpy as np
@@ -60,6 +61,7 @@ class Q1Sequencer:
             return partial(self.set, name)
 
     def set(self, name, value):
+        level = logging.DEBUG
         if name == 'name':
             self.name = value
             self.rt_renderer.name = value
@@ -68,7 +70,7 @@ class Q1Sequencer:
         elif name == 'mod_en_awg':
             self._mod_en_awg = value
         elif name == 'nco_freq':
-            print(f'{self.name}: {name}={value}')
+            logging.info(f'{self.name}: {name}={value}')
             self._nco_freq = value
         elif name == 'demod_en_acq':
             self._demod_en_acq = value
@@ -81,7 +83,8 @@ class Q1Sequencer:
         elif name == 'max_core_cycles':
             self.q1core.max_core_cycles = value
         else:
-            print(f'{self.name}: {name}={value}')
+            level = logging.INFO
+        logging.log(level, f'{self.name}: {name}={value}')
 
     def upload(self, file_name):
         with open(file_name) as fp:

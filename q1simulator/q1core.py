@@ -1,3 +1,4 @@
+import logging
 import re
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -147,7 +148,7 @@ class Q1Core:
                                 'FORCED STOP')
         except Halt:
             rt_time_us = self.renderer.time / 1000
-            print(f'{self.name}: stopped ({cntr} cycles, {rt_time_us:7.3f} us)')
+            logging.info(f'{self.name}: stopped ({cntr} cycles, {rt_time_us:7.3f} us)')
         except Illegal as ex:
             msg = f'Illegal instruction at line {self.iptr}: {ex}'
             self._print_error_msg(msg, instr, cntr)

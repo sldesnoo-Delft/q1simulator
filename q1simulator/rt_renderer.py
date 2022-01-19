@@ -1,3 +1,4 @@
+import logging
 from copy import copy
 from dataclasses import dataclass
 from typing import Optional
@@ -138,6 +139,7 @@ class Renderer:
         self._render(wait_after)
 
     def _error(self, msg):
+        logging.error(f'{self.name}: {msg}')
         self.errors.add(msg)
 
     def _update_settings(self):
@@ -154,7 +156,8 @@ class Renderer:
 
     def _render(self, time):
         if time & 0x0003:
-            print(f'wait time not aligned on 4 ns boundary: {time} ns')
+            logging.error(f'{self.name}: wait time not aligned on '
+                          f'4 ns boundary: {time} ns (offset={time&0x03} ns)')
             self._error('TIME NOT ALIGNED')
         # 16 bits, 4 ns resolution
         time &= 0xFFFC

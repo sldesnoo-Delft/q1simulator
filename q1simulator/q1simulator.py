@@ -1,3 +1,4 @@
+import logging
 from functools import partial
 
 import numpy as np
@@ -49,7 +50,7 @@ class Q1Simulator(qc.Instrument):
             seq_nr = int(name[9])
             self.sequencers[seq_nr].set(name[11:], value)
         else:
-            print(f'{self.name}:{name}={value}')
+            logging.info(f'{self.name}:{name}={value}')
 
     def get_system_status(self):
         return 'OK'
