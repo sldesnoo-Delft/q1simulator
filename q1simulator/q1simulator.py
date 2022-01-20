@@ -8,6 +8,7 @@ from .q1sequencer import Q1Sequencer
 
 
 class Q1Simulator(qc.Instrument):
+     # TODO @@@ convert to qc.Parameter
     _sim_parameters = [
         'reference_source',
         'out0_offset',
@@ -31,6 +32,7 @@ class Q1Simulator(qc.Instrument):
         super().__init__(name)
         self.sequencers = [Q1Sequencer(f'{name}-{i}') for i in range(n_sequencers)]
         self.armed_seq = set()
+        self._gain = [0, 0]
 
     def reset(self):
         self.armed_seq = set()
@@ -54,6 +56,18 @@ class Q1Simulator(qc.Instrument):
 
     def get_system_status(self):
         return 'OK'
+
+    def in0_gain(self, value=None):
+        if value is None:
+            return self._gain[0]
+        else:
+            self._gain[0] = value
+
+    def in1_gain(self, value=None):
+        if value is None:
+            return self._gain[1]
+        else:
+            self._gain[1] = value
 
     def arm_sequencer(self, seq_nr):
         self.armed_seq.add(seq_nr)
