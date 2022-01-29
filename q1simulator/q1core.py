@@ -133,6 +133,11 @@ class Q1Core:
         self.iptr = 0
         self.clock = CoreClock()
 
+        if len(self.instructions) == 0:
+            print(f'*** No instructions loaded')
+            self._error('SEQUENCE PROCESSOR Q1 ILLEGAL INSTRUCTION')
+            return
+
         try:
             cntr = 0
             while(True):
