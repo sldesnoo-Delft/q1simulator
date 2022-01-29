@@ -8,7 +8,6 @@ from .q1sequencer import Q1Sequencer
 
 
 class Q1Simulator(qc.Instrument):
-     # TODO @@@ convert to qc.Parameter
     _sim_parameters = [
         'reference_source',
         'out0_offset',
@@ -32,20 +31,19 @@ class Q1Simulator(qc.Instrument):
         super().__init__(name)
         self.sequencers = [Q1Sequencer(f'{name}-{i}') for i in range(n_sequencers)]
         self.armed_seq = set()
-        self._gain = [0, 0]
+        for par_name in self._sim_parameters:
+            self.add_parameter(par_name, set_cmd=partial(self.set, par_name))
+        for i,seq in enumerate(self.sequencers):
+            for par_name in seq._seq_parameters:
+                name = f'sequencer{i}_{par_name}'
+                self.add_parameter(name, set_cmd=partial(self.set, name))
+        self.in0_gain(0)
+        self.in1_gain(0)
 
     def reset(self):
         self.armed_seq = set()
         for seq in self.sequencers:
             seq.reset()
-
-    def __getattr__(self, name):
-        if name in self._sim_parameters:
-            return partial(self.set, name)
-        if name.startswith('sequencer'):
-            seq_nr = int(name[9])
-            return getattr(self.sequencers[seq_nr], name[11:])
-        raise AttributeError()
 
     def set(self, name, value):
         if name.startswith('sequencer'):
@@ -56,18 +54,6 @@ class Q1Simulator(qc.Instrument):
 
     def get_system_status(self):
         return 'OK'
-
-    def in0_gain(self, value=None):
-        if value is None:
-            return self._gain[0]
-        else:
-            self._gain[0] = value
-
-    def in1_gain(self, value=None):
-        if value is None:
-            return self._gain[1]
-        else:
-            self._gain[1] = value
 
     def arm_sequencer(self, seq_nr):
         self.armed_seq.add(seq_nr)
