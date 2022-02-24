@@ -210,7 +210,7 @@ class Renderer:
             self._error('ACQ INDEX INVALID')
             return
         self.acq_times[bins].append((t, bin_index))
-        if bin_index > self.acq_bins[bins]:
+        if bin_index >= self.acq_bins[bins]:
             self._error('ACQ BIN INDEX INVALID')
         elif not self.acq_buffer.add(t):
             self._error('ACQ BINNING FIFO ERROR')
