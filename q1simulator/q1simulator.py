@@ -53,7 +53,7 @@ class Q1Simulator(qc.Instrument):
             logging.info(f'{self.name}:{name}={value}')
 
     def get_system_status(self):
-        return {'status':'OK', 'flags':[]}
+        return {'status':'OKAY', 'flags':[]}
 
     def arm_sequencer(self, seq_nr):
         self.armed_seq.add(seq_nr)
