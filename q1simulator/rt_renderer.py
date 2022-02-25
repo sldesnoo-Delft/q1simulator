@@ -215,7 +215,10 @@ class Renderer:
         elif not self.acq_buffer.add(t):
             self._error('ACQ BINNING FIFO ERROR')
         else:
-            self.acq_data[bins][bin_index] = t
+            if self.acq_count[bins][bin_index] == 0:
+                self.acq_data[bins][bin_index] = t
+            else:
+                self.acq_data[bins][bin_index] += t
             self.acq_count[bins][bin_index] += 1
 
     def plot(self):
