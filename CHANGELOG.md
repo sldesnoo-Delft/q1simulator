@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.2.1] - 2022-04-01
+
+### Fixed
+- Return averaged acquisition data
+
 ## \[0.2.0] - 2022-03-07
 
 ### Fixed
