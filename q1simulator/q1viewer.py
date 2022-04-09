@@ -1,9 +1,10 @@
+import sys
 from dataclasses import dataclass, field
 from typing import List, Optional
 
 import matplotlib.pyplot as pt
 
-from .q1simulator import Q1Simulator
+from .q1simulator import Q1Simulator, _legacy_code
 
 
 @dataclass
@@ -27,27 +28,41 @@ def plot_q1asm_files(plot_defs,
                      max_render_time=2e6,
                      max_core_cycles=1e7):
 
-    sim = Q1Simulator('sim', n_sequencers=len(plot_defs))
+    sim = Q1Simulator('sim', n_sequencers=len(plot_defs), sim_type='Viewer')
+    sim.config('max_render_time', max_render_time)
+    sim.config('max_core_cycles', max_core_cycles)
+
     for i,plot in enumerate(plot_defs):
         prefix = f'sequencer{i}_'
 
         if plot.sequencer_name:
-            sim.set(prefix + 'name', plot.sequencer_name)
-        sim.set(prefix + 'max_render_time', max_render_time)
-        sim.set(prefix + 'max_core_cycles', max_core_cycles)
+            sim.config_seq(i, 'name', plot.sequencer_name)
 
-        if plot.lo_frequency is None:
-            sim.set(prefix + 'mod_en_awg', False)
+        if _legacy_code:
+            if plot.lo_frequency is None:
+                sim.set(prefix + 'mod_en_awg', False)
+            else:
+                sim.set(prefix + 'mod_en_awg', True)
+                sim.set(prefix + 'nco_freq', plot.lo_frequency)
+
+            for ch in plot.out:
+                path = ch % 2
+                sim.set(prefix + f'channel_map_path{path}_out{ch}_en', True)
+
+            sim.set(prefix + 'waveforms_and_program', plot.filename)
         else:
-            sim.set(prefix + 'mod_en_awg', True)
-            sim.set(prefix + 'nco_freq', plot.lo_frequency)
+            sequencer = getattr(sim, f'sequencer{i}')
+            if plot.lo_frequency is None:
+                sequencer.set('mod_en_awg', False)
+            else:
+                sequencer.set('mod_en_awg', True)
+                sequencer.set('nco_freq', plot.lo_frequency)
 
-        for ch in plot.out:
-            path = ch % 2
-            sim.set(prefix + f'channel_map_path{path}_out{ch}_en', True)
+            for ch in plot.out:
+                path = ch % 2
+                sequencer.set(f'channel_map_path{path}_out{ch}_en', True)
 
-        sim.set(prefix + 'waveforms_and_program',
-                plot.filename)
+            sequencer.set('sequence', plot.filename)
 
         sim.arm_sequencer(i)
 
@@ -64,3 +79,11 @@ def plot_q1asm_files(plot_defs,
     sim.print_acquisitions()
 
     sim.close()
+
+
+def main(argv):
+    plot_q1asm_file(argv[0])
+    pt.show()
+
+if __name__ == "__main__":
+   main(sys.argv[1:])

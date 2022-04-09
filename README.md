@@ -25,7 +25,7 @@ The renderer uses the uploaded waveforms and the nco frequency.
 
 # Example
 
-    sim = Q1Simulator('q1sim')
+    sim = Q1Simulator('q1sim', sim_type='QCM')
     sim.sequencer0_waveforms_and_program('my_sequence.json')
     sim.arm_sequencer(0)
     sim.start_sequencer()
@@ -54,6 +54,10 @@ and plots and prints the results.
 
 See demo directory for some examples.
 
+The viewer can be executed from the commandline to view a single sequence file:
+`python -m q1simulator.q1viewer q1simulator\demo\demo_data\q1seq_P1.json`
+
+
 # Simulator rendering limits
 The maximum length of the rendered output is limited to 2 ms,
 because plots with more points do not perform well.
@@ -61,30 +65,30 @@ The maximum number of execution cycles is limited to 1e7,
 because 1 cycle take 1 to 6 us in the simulator. So, after
 10 to 60 seconds the simulator aborts execution of a sequencer.
 
-The limits can be modified:
-    sim.set('sequencer0_max_render_time', 10_000_000)
-    sim.set('sequencer0_max_core_cycles', 1e9)
+The limits can be changed:
+    sim.config('max_render_time', 10_000_000)
+    sim.config('max_core_cycles', 1e9)
 
 
 # Implemented methods
 The following QCM/QRM methods and parameters are implemented by
 the simulator and mimic behavior of the device:
 - reset
-- get_system_status
+- get_system_state
 - get_sequencer_state
 - arm_sequencer
 - start_sequencer
 - stop_sequencer
 - get_acquisition_state
 - get_acquisitions
-- sequencer0_nco_freq
-- sequencer0_mod_en_awg
-- sequencer0_demod_en_acq
-- sequencer0_channel_map_path0_out0_en
-- sequencer0_channel_map_path1_out1_en
-- sequencer0_channel_map_path0_out2_en
-- sequencer0_channel_map_path1_out3_en
-- sequencer0_waveforms_and_program
+- sequencer0.nco_freq
+- sequencer0.mod_en_awg
+- sequencer0.demod_en_acq
+- sequencer0.channel_map_path0_out0_en
+- sequencer0.channel_map_path1_out1_en
+- sequencer0.channel_map_path0_out2_en
+- sequencer0.channel_map_path1_out3_en
+- sequencer0.sequence
 
 All other parameters only print the passed value.
 
@@ -120,7 +124,7 @@ Output:
 One day after I had been working on the generation of Q1ASM I thought
 it would be fun to write a interpreter to execute the generated Q1ASM.
 A few hours later I had a parser, an interpreter and an output renderer
-that plotted the output of the Q1ASM file that I had generated earlier
+plotting the output of the Q1ASM file that I had generated earlier
 that day. Above all it showed there was an error in the timing of
 generated signal. The next day I started to use Q1Simulator to
 check the code I generated with Q1Pulse and pulselib. I found

@@ -46,9 +46,10 @@ def evaluate_args(arg_types, *, dest_arg=None):
 
 
 class Q1Core:
-    def __init__(self, name, renderer):
+    def __init__(self, name, renderer, is_qrm):
         self.name = name
         self.renderer = renderer
+        self._is_qrm = is_qrm
         self.max_core_cycles= 10_000_000
         self.R = [0]*64
         self.iptr = 0
@@ -366,12 +367,16 @@ class Q1Core:
 
     @evaluate_args('I,IR,I')
     def _acquire(self, bins, bin_index, wait_after):
+        if not self._is_qrm:
+            raise NotImplementedError('instrument type is not QRM')
         self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire(bins, bin_index, wait_after)
 
     @evaluate_args('I,IR,R,R,I')
     def _acquire_weighed(self, bins, bin_index, weight0, weight1, wait_after):
+        if not self._is_qrm:
+            raise NotImplementedError('instrument type is not QRM')
         self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire_weighed(bins, bin_index, weight0, weight1, wait_after)

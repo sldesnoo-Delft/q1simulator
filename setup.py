@@ -4,11 +4,12 @@ packages = ['q1simulator']
 print('packages: {}'.format(packages))
 
 setup(name="q1simulator",
-	version="0.2",
+	version="0.3.0",
     description="Simulator for Q1ASM",
     author="Sander de Snoo",
 	packages = find_packages(),
 	install_requires=[
         'qcodes',
+        'qblox_instruments',
       ],
 	)
