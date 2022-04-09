@@ -8,6 +8,11 @@ All notable changes to Q1Simulator will be documented in this file.
    - Note: still backwards compatible with qblox_instruments v0.5
 - Instrument type 'QCM' or 'QRM' must be specified
 
+## \[0.2.1] - 2022-04-01
+
+### Fixed
+- Return averaged acquisition data
+
 ## \[0.2.0] - 2022-03-07
 
 ### Fixed

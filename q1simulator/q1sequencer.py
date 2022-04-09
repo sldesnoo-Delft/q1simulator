@@ -247,7 +247,9 @@ class Q1Sequencer(InstrumentModule):
             index = int(datadict['index'])
             num_bins = int(datadict['num_bins'])
             acq_count = cnt[index]
-            path_data = data[index]
+            path_data = [d/c if c > 0 else float('nan')
+                         for d,c in zip(data[index], cnt[index])]
+
             result[name] = {
                 'index':index,
                 'acquisition':{
