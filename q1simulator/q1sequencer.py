@@ -3,7 +3,7 @@ from functools import partial
 import json
 import numpy as np
 
-from qcodes.instrument.channel import InstrumentModule
+from qcodes.instrument.channel import InstrumentChannel
 
 from .q1core import Q1Core
 from .rt_renderer import Renderer
@@ -15,7 +15,7 @@ except:
     _legacy_code = True
 
 
-class Q1Sequencer(InstrumentModule):
+class Q1Sequencer(InstrumentChannel):
     # Legacy parameter list for qblox_instruments < v0.6
     _seq_parameters = [
         # -- handled settings:
