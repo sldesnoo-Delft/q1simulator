@@ -6,16 +6,10 @@ import qcodes as qc
 
 from .q1sequencer import Q1Sequencer
 
-try:
-    from qblox_instruments import (
-            SystemStatus, SystemState, SystemStatusSlotFlags,
-            InstrumentClass, InstrumentType,
-            )
-
-    _legacy_code = False
-except:
-    print('Q1Simulator assumes qblox_instruments < v0.6')
-    _legacy_code = True
+from qblox_instruments import (
+        SystemStatus, SystemState, SystemStatusSlotFlags,
+        InstrumentClass, InstrumentType,
+        )
 
 
 class Q1Simulator(qc.Instrument):
@@ -43,7 +37,7 @@ class Q1Simulator(qc.Instrument):
     def __init__(self, name, n_sequencers=6, sim_type=None):
         super().__init__(name)
         self._sim_type = sim_type
-        if sim_type is None and not _legacy_code:
+        if sim_type is None:
             raise Exception('sim_type must be specified')
 
         self._is_qcm = sim_type in [None, 'QCM', 'Viewer']
@@ -60,14 +54,8 @@ class Q1Simulator(qc.Instrument):
 
         self.sequencers = [Q1Sequencer(self, f'seq{i}', sim_type)
                            for i in range(n_sequencers)]
-        if _legacy_code:
-            for i,seq in enumerate(self.sequencers):
-                for par_name in seq._seq_parameters:
-                    name = f'sequencer{i}_{par_name}'
-                    self.add_parameter(name, set_cmd=partial(self._seq_set, name))
-        else:
-            for i,seq in enumerate(self.sequencers):
-                self.add_submodule(f'sequencer{i}', seq)
+        for i,seq in enumerate(self.sequencers):
+            self.add_submodule(f'sequencer{i}', seq)
 
         self.armed_seq = set()
         if self._is_qrm:
@@ -106,10 +94,6 @@ class Q1Simulator(qc.Instrument):
         seq_nr = int(name[9])
         self.sequencers[seq_nr]._set_legacy(name[11:], value)
 
-    def get_system_status(self):
-        ''' Legacy method qblox_instruments version < v0.6 '''
-        return {'status':'OKAY', 'flags':[]}
-
     def get_system_state(self):
         return SystemState(
             SystemStatus.OKAY,
@@ -128,10 +112,7 @@ class Q1Simulator(qc.Instrument):
         self.armed_seq = set()
 
     def get_sequencer_state(self, seq_nr, timeout=0):
-        if not _legacy_code:
-            return self.sequencers[seq_nr].get_state()
-        else:
-            return self.sequencers[seq_nr].get_state_legacy()
+        return self.sequencers[seq_nr].get_state()
 
     def get_acquisition_state(self, seq_nr, timeout=0):
         return self.sequencers[seq_nr].get_acquisition_state()

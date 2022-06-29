@@ -8,46 +8,10 @@ from qcodes.instrument.channel import InstrumentChannel
 from .q1core import Q1Core
 from .rt_renderer import Renderer
 
-try:
-    from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
-    _legacy_code = False
-except:
-    _legacy_code = True
+from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
 
 
 class Q1Sequencer(InstrumentChannel):
-    # Legacy parameter list for qblox_instruments < v0.6
-    _seq_parameters = [
-        # -- handled settings:
-        'nco_freq',
-        'mod_en_awg',
-        'demod_en_acq',
-        'channel_map_path0_out0_en',
-        'channel_map_path1_out1_en',
-        'channel_map_path0_out2_en',
-        'channel_map_path1_out3_en',
-        'waveforms_and_program',
-        # -- only printed:
-        'sync_en',
-        'nco_phase_offs',
-        'marker_ovr_en',
-        'marker_ovr_value',
-        'cont_mode_en_awg_path0',
-        'cont_mode_en_awg_path1',
-        'cont_mode_waveform_idx_awg_path0',
-        'cont_mode_waveform_idx_awg_path1',
-        'upsample_rate_awg_path0',
-        'upsample_rate_awg_path1',
-        'gain_awg_path0',
-        'gain_awg_path1',
-        'offset_awg_path0',
-        'offset_awg_path1',
-        'mixer_corr_phase_offset_degree',
-        'mixer_corr_gain_ratio',
-        'integration_length_acq',
-        'phase_rotation_acq',
-        'discretization_threshold_acq',
-        ]
 
     # only logged
     _seq_log_only_parameters = [
@@ -128,10 +92,6 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer = Renderer(self.name)
         self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm)
 
-    def __getattr__(self, name):
-        if name in self._seq_parameters:
-            return partial(self.set, name)
-
     def _log_set(self, name, value):
         logging.info(f'{self.name}: {name}={value}')
 
@@ -150,26 +110,6 @@ class Q1Sequencer(InstrumentChannel):
     def _set_channel_map_path_en(self, path, out, value):
         logging.debug(f'{self.name}: channel_map_path{path}_out{out}_en={value}')
         self.rt_renderer.path_enable(path, out, value)
-
-    def _set_legacy(self, name, value):
-        ''' Legacy setter called by Q1Simulator. '''
-        level = logging.DEBUG
-        if name == 'waveforms_and_program':
-            self.upload(value)
-        elif name == 'mod_en_awg':
-            self._mod_en_awg = value
-        elif name == 'nco_freq':
-            level = logging.INFO
-            self._nco_freq = value
-        elif name == 'demod_en_acq':
-            self._demod_en_acq = value
-        elif name.startswith('channel_map_path'):
-            path = int(name[16])
-            out = int(name[21])
-            self.rt_renderer.path_enable(path, out, value)
-        else:
-            level = logging.INFO
-        logging.log(level, f'{self.name}: {name}={value}')
 
     def upload(self, file_name):
         with open(file_name) as fp:
@@ -209,12 +149,6 @@ class Q1Sequencer(InstrumentChannel):
             num_bins = int(datadict['num_bins'])
             bins_dict[index] = num_bins
         self.rt_renderer.set_acquisition_bins(bins_dict)
-
-    def get_state_legacy(self):
-        return {
-            'status':self.run_state,
-            'flags':list(self.q1core.errors | self.rt_renderer.errors)
-            }
 
     def get_state(self):
         flags = list(self.q1core.errors | self.rt_renderer.errors)

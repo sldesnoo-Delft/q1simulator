@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import matplotlib.pyplot as pt
 
-from .q1simulator import Q1Simulator, _legacy_code
+from .q1simulator import Q1Simulator
 
 
 @dataclass
@@ -33,36 +33,21 @@ def plot_q1asm_files(plot_defs,
     sim.config('max_core_cycles', max_core_cycles)
 
     for i,plot in enumerate(plot_defs):
-        prefix = f'sequencer{i}_'
-
         if plot.sequencer_name:
             sim.config_seq(i, 'name', plot.sequencer_name)
 
-        if _legacy_code:
-            if plot.lo_frequency is None:
-                sim.set(prefix + 'mod_en_awg', False)
-            else:
-                sim.set(prefix + 'mod_en_awg', True)
-                sim.set(prefix + 'nco_freq', plot.lo_frequency)
-
-            for ch in plot.out:
-                path = ch % 2
-                sim.set(prefix + f'channel_map_path{path}_out{ch}_en', True)
-
-            sim.set(prefix + 'waveforms_and_program', plot.filename)
+        sequencer = getattr(sim, f'sequencer{i}')
+        if plot.lo_frequency is None:
+            sequencer.set('mod_en_awg', False)
         else:
-            sequencer = getattr(sim, f'sequencer{i}')
-            if plot.lo_frequency is None:
-                sequencer.set('mod_en_awg', False)
-            else:
-                sequencer.set('mod_en_awg', True)
-                sequencer.set('nco_freq', plot.lo_frequency)
+            sequencer.set('mod_en_awg', True)
+            sequencer.set('nco_freq', plot.lo_frequency)
 
-            for ch in plot.out:
-                path = ch % 2
-                sequencer.set(f'channel_map_path{path}_out{ch}_en', True)
+        for ch in plot.out:
+            path = ch % 2
+            sequencer.set(f'channel_map_path{path}_out{ch}_en', True)
 
-            sequencer.set('sequence', plot.filename)
+        sequencer.set('sequence', plot.filename)
 
         sim.arm_sequencer(i)
 
