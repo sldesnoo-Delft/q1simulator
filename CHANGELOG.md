@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.4.0] - 2022-06-29
+
+### Added
+- Supported types 'QCM-RF' and 'QRM-RF'
+- added RF parameters (simulator only logs values)
+
+### Deleted
+- Removed support for qblox-instruments < v0.6
+
 ## \[0.3.0] - 2022-04-13
 
 ### Changed

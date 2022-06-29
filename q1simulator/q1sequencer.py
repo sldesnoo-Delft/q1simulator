@@ -41,8 +41,8 @@ class Q1Sequencer(InstrumentChannel):
 
     def __init__(self, parent, name, sim_type):
         super().__init__(parent, name)
-        self._is_qcm = sim_type in [None, 'QCM', 'Viewer']
-        self._is_qrm = sim_type in [None, 'QRM', 'Viewer']
+        self._is_qcm = sim_type in ['QCM', 'QCM-RF', 'Viewer']
+        self._is_qrm = sim_type in ['QRM', 'QRM-RF', 'Viewer']
 
         if self._is_qrm:
             log_params = self._seq_log_only_parameters + self._seq_log_only_parameters_qrm

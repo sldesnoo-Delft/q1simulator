@@ -26,7 +26,7 @@ The renderer uses the uploaded waveforms and the nco frequency.
 # Example
 
     sim = Q1Simulator('q1sim', sim_type='QCM')
-    sim.sequencer0_waveforms_and_program('my_sequence.json')
+    sim.sequencer0.waveforms_and_program('my_sequence.json')
     sim.arm_sequencer(0)
     sim.start_sequencer()
     sim.get_sequencer_state(0)

@@ -13,18 +13,48 @@ from qblox_instruments import (
 
 
 class Q1Simulator(qc.Instrument):
-    _sim_parameters_both = [
+    _sim_parameters_qcm = [
         'reference_source',
         'out0_offset',
         'out1_offset',
-        ]
-    _sim_parameters_qcm = [
         'out2_offset',
         'out3_offset',
         ]
+    _sim_parameters_qcm_rf = [
+        'reference_source',
+        'out0_lo_freq',
+        'out1_lo_freq',
+        'out0_lo_en',
+        'out1_lo_en',
+        'out0_att',
+        'out1_att',
+        'out0_offset_path0',
+        'out0_offset_path1',
+        'out1_offset_path0',
+        'out1_offset_path1',
+        ]
     _sim_parameters_qrm = [
+        'reference_source',
+        'out0_offset',
+        'out1_offset',
         'in0_gain',
         'in1_gain',
+        'scope_acq_trigger_mode_path0',
+        'scope_acq_trigger_mode_path1',
+        'scope_acq_trigger_level_path0',
+        'scope_acq_trigger_level_path1',
+        'scope_acq_sequencer_select',
+        'scope_acq_avg_mode_en_path0',
+        'scope_acq_avg_mode_en_path1',
+        ]
+    _sim_parameters_qrm_rf = [
+        'reference_source',
+        'in0_att',
+        'out0_att',
+        'out0_in0_lo_freq',
+        'out0_in0_lo_en',
+        'out0_offset_path0',
+        'out0_offset_path1',
         'scope_acq_trigger_mode_path0',
         'scope_acq_trigger_mode_path1',
         'scope_acq_trigger_level_path0',
@@ -40,14 +70,20 @@ class Q1Simulator(qc.Instrument):
         if sim_type is None:
             raise Exception('sim_type must be specified')
 
-        self._is_qcm = sim_type in [None, 'QCM', 'Viewer']
-        self._is_qrm = sim_type in [None, 'QRM', 'Viewer']
+        self._is_qcm = sim_type in ['QCM', 'QCM-RF', 'Viewer']
+        self._is_qrm = sim_type in ['QRM', 'QRM-RF', 'Viewer']
+        self._is_rf = sim_type in ['QCM-RF', 'QRM-RF']
 
-        sim_params = self._sim_parameters_both.copy()
-        if self._is_qcm:
-            sim_params += self._sim_parameters_qcm
-        if self._is_qrm:
-            sim_params += self._sim_parameters_qrm
+        if sim_type == 'QCM':
+            sim_params = self._sim_parameters_qcm
+        elif sim_type == 'QCM-RF':
+            sim_params = self._sim_parameters_qcm_rf
+        elif sim_type == 'QRM':
+            sim_params = self._sim_parameters_qrm
+        elif sim_type == 'QRM-RF':
+            sim_params = self._sim_parameters_qrm_rf
+        else:
+            sim_params = []
 
         for par_name in sim_params:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
@@ -80,7 +116,7 @@ class Q1Simulator(qc.Instrument):
 
     @property
     def is_rf_type(self):
-        return False
+        return self._is_rf
 
     def reset(self):
         self.armed_seq = set()
