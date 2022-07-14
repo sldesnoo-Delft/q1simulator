@@ -41,11 +41,17 @@ class Q1Sequencer(InstrumentChannel):
         super().__init__(parent, name)
         self._is_qcm = sim_type in ['QCM', 'QCM-RF', 'Viewer']
         self._is_qrm = sim_type in ['QRM', 'QRM-RF', 'Viewer']
+        self._is_rf = sim_type in ['QCM-RF', 'QRM-RF']
 
         if self._is_qrm:
             log_params = self._seq_log_only_parameters + self._seq_log_only_parameters_qrm
+            self._v_max = 0.5
         else:
             log_params = self._seq_log_only_parameters
+            self._v_max = 2.5
+
+        if self._is_rf:
+            self._v_max = 3.3
 
         for par_name in log_params:
             self.add_parameter(par_name,
@@ -203,7 +209,7 @@ class Q1Sequencer(InstrumentChannel):
         return result
 
     def plot(self):
-        self.rt_renderer.plot()
+        self.rt_renderer.plot(self._v_max)
 
     def print_registers(self, reg_nrs=None):
         self.q1core.print_registers(reg_nrs)

@@ -226,15 +226,16 @@ class Renderer:
                 self.acq_data[bins][bin_index] += t
             self.acq_count[bins][bin_index] += 1
 
-    def plot(self):
+    def plot(self, v_max):
+        scaling = v_max/2**15
         if self.time > self.max_render_time:
             max_ms = self.max_render_time / 1e6
             print(f'{self.name}: Rendering truncated at {max_ms:3.1f} ms. Total time: {self.time/1e6:4.1f} ms')
         if len(self.path_out_enabled[0]):
-            out0 = np.concatenate(self.out0)
+            out0 = scaling * np.concatenate(self.out0)
             pt.plot(out0, label=f'{self.name}.{self.path_out_enabled[0]}')
         if len(self.path_out_enabled[1]):
-            out1 = np.concatenate(self.out1)
+            out1 = scaling * np.concatenate(self.out1)
             pt.plot(out1, label=f'{self.name}.{self.path_out_enabled[1]}')
 
     def get_acquisition_data(self):
