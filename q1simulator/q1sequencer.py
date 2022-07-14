@@ -30,8 +30,6 @@ class Q1Sequencer(InstrumentChannel):
         'gain_awg_path1',
         'offset_awg_path0',
         'offset_awg_path1',
-        'mixer_corr_phase_offset_degree',
-        'mixer_corr_gain_ratio',
         ]
     _seq_log_only_parameters_qrm = [
         'integration_length_acq',
@@ -56,6 +54,9 @@ class Q1Sequencer(InstrumentChannel):
         self.add_parameter('sequence', set_cmd=self.upload)
         self.add_parameter('mod_en_awg', set_cmd=self._set_mod_en_awg)
         self.add_parameter('nco_freq', set_cmd=self._set_nco_freq)
+        self.add_parameter('mixer_corr_gain_ratio', set_cmd=self._set_mixer_gain_ratio)
+        self.add_parameter('mixer_corr_phase_offset_degree', set_cmd=self._set_mixer_phase_offset_degree)
+
         self.add_parameter('channel_map_path0_out0_en',
                            set_cmd=partial(self._set_channel_map_path_en, 0, 0))
         self.add_parameter('channel_map_path1_out1_en',
@@ -80,10 +81,6 @@ class Q1Sequencer(InstrumentChannel):
             self.q1core.max_core_cycles = value
 
     def reset(self):
-        self._mod_en_awg = False
-        self._nco_freq = 0.0
-        self._demod_en_acq = False
-
         self.waveforms = {}
         self.weights = {}
         self.acquisition_bins = {}
@@ -97,15 +94,23 @@ class Q1Sequencer(InstrumentChannel):
 
     def _set_mod_en_awg(self, value):
         logging.debug(f'{self.name}: mod_en_awg={value}')
-        self._mod_en_awg = value
+        self.rt_renderer.mod_en_awg = value
 
     def _set_nco_freq(self, value):
         logging.info(f'{self.name}: nco_freq={value}')
-        self._nco_freq = value
+        self.rt_renderer.nco_frequency = value
 
     def _set_demod_en_acq(self, value):
         logging.debug(f'{self.name}: demod_en_acq={value}')
-        self._demod_en_acq = value
+        self.rt_renderer.demod_en_acq = value
+
+    def _set_mixer_gain_ratio(self, value):
+        logging.debug(f'{self.name}: mixer_gain_ratio={value}')
+        self.rt_renderer.mixer_gain_ratio = value
+
+    def _set_mixer_phase_offset_degree(self, value):
+        logging.debug(f'{self.name}: mixer_phase_offset_degree={value}')
+        self.rt_renderer.mixer_phase_offset_degree = value
 
     def _set_channel_map_path_en(self, path, out, value):
         logging.debug(f'{self.name}: channel_map_path{path}_out{out}_en={value}')
@@ -168,7 +173,6 @@ class Q1Sequencer(InstrumentChannel):
     def run(self):
         self.run_state = 'RUNNING'
         self.rt_renderer.reset()
-        self.rt_renderer.set_nco(self._nco_freq, self._mod_en_awg)
         self.q1core.run()
         self.run_state = 'STOPPED'
 

@@ -36,6 +36,11 @@ class Renderer:
         self.acq_weights = {}
         self.acq_bins = {}
         self.path_out_enabled = [set(), set()]
+        self.nco_frequency = 0.0
+        self.mod_en_awg = False
+        self.nco_phase_offset = 0.0
+        self.mixer_gain_ratio = 1.0
+        self.mixer_phase_offset_degree = 0.0
         self.reset()
 
     def reset(self):
@@ -45,9 +50,6 @@ class Renderer:
         self.wave_start = 0
         self.waves_end = (0,0)
         self.waves = (None, None)
-        self.nco_frequency = 0.0
-        self.nco_enabled = False
-        self.nco_phase_offset = 0.0
         self.out0 = []
         self.out1 = []
         self.acq_count = {
@@ -65,10 +67,6 @@ class Renderer:
             self.path_out_enabled[path].add(out)
         else:
             self.path_out_enabled[path].discard(out)
-
-    def set_nco(self, frequency, enabled):
-        self.nco_frequency = frequency
-        self.nco_enabled = enabled
 
     def set_waveforms(self, wavedict):
         self.wavedict = wavedict
@@ -187,14 +185,21 @@ class Renderer:
             data = self.waves[1][t_start-self.wave_start:end-self.wave_start]
             path1[0:len(data)] += (int(_i16(s.awg_gain1)) * data // 2**15)
 
-        if self.nco_enabled:
+        if self.mod_en_awg:
             t = np.arange(t_start, t_end)
             phase = (2*np.pi*self.nco_phase_offset + 2*np.pi*self.nco_frequency * 1e-9 * t)
             lo = np.cos(phase) + 1j*np.sin(phase)
-            data = path0 + 1j*path1
-            data = data * lo
-            data0 = data.real.astype(np.int16)
-            data1 = data.imag.astype(np.int16)
+            data0 = lo.real*path0 - lo.imag*path1
+            if self.mixer_phase_offset_degree != 0.0:
+                phase_offset = self.mixer_phase_offset_degree/180*np.pi
+                lo *= np.cos(phase_offset) + 1j*np.sin(phase_offset)
+            data1 = lo.imag*path0 + lo.real*path1
+            if self.mixer_gain_ratio > 1.0:
+                data0 *= 1/self.mixer_gain_ratio
+            if self.mixer_gain_ratio < 1.0:
+                data1 *= self.mixer_gain_ratio
+            data0 = data0.astype(np.int16)
+            data1 = data1.astype(np.int16)
         else:
             data0 = path0
             data1 = path1

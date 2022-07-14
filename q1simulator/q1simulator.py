@@ -74,6 +74,9 @@ class Q1Simulator(qc.Instrument):
         self._is_qrm = sim_type in ['QRM', 'QRM-RF', 'Viewer']
         self._is_rf = sim_type in ['QCM-RF', 'QRM-RF']
 
+        if not (self._is_qcm or self._is_qrm):
+            raise ValueError(f'Unknown sim_type: {sim_type}')
+
         if sim_type == 'QCM':
             sim_params = self._sim_parameters_qcm
         elif sim_type == 'QCM-RF':

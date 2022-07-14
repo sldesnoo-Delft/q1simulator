@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.4.1] - 2022-07-14
+
+### Added
+- Added handling of mixer_corr_gain_ratio and mixer_corr_phase_offset_degree to sequencer
+
 ## \[0.4.0] - 2022-06-29
 
 ### Added
