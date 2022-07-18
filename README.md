@@ -16,6 +16,8 @@ executor in the path data and increments the avg_cnt.
 This makes it easy to check the timing of the acquire instructions.
 The acquire instructions also check the time between the triggers
 and report an error when there would be an FIFO error.
+The acquisition data returned by the sequencer can be set with
+`set_acquisition_mock_data`.
 
 The complete Q1ASM instruction set has been implemented.
 Q1Simulator simulates the (estimated) execution time of Q1ASM and
@@ -91,6 +93,52 @@ the simulator and mimic behavior of the device:
 - sequencer0.sequence
 
 All other parameters only print the passed value.
+
+# Setting simulator acquisition data
+Acquisition mock data can be set with `set_acquisition_mock_data`.
+The data should passed in a list for multiple runs of the sequence.
+For every run there should be a list with entries for every `acquire`
+call. The entry for an acquire call is used for both paths.
+If it is a single float value then it is used for both paths.
+If it is a complex value then the real part is used for path 0 and
+the imaginary part for path 1.
+If it is a sequence of two floats then the first is used for path 0
+and the second for path 1.
+
+When `repeat=True` the list with data is repeated, otherwise
+an exception is raised when the sequencer is started when the
+list with mock data is exhausted.
+
+Passing None for mock data resets the default behavior of the sequencer.
+The default behavior is to return the real-time timestamp of the
+acquire call.
+
+Example:
+
+    # set data for 1 run to return the values 0 till 19 on path 0 and path 1
+    data = [np.arange(20)]
+    sim.sequencers[0].set_acquisition_mock_data(data)
+
+    # set data for every run to return IQ values with changing phase
+    # on path 0 and 1
+    data = [np.exp(np.pi*1j*np.arange(20)/10)]
+    sim.sequencers[0].set_acquisition_mock_data(data, repeat=True)
+
+    # set data for every run to return the values 0 till 19 on path 0
+    # and 100 till 119 on path 1.
+    data = [np.arange(20) + 1j*np.arange(100,120)]
+    sim.sequencers[0].set_acquisition_mock_data(data, repeat=True)
+
+    # set data for 2 runs to return the values 0 till 19 on the first run
+    # and 100 till 119 on the second run.
+    data2 = [np.arange(20), np.arange(100, 120)]
+    sim.sequencers[0].set_acquisition_mock_data(data2)
+
+    # Return 0...19 and 100...119 alternatingly.
+    sim.sequencers[0].set_acquisition_mock_data(data2, repeat=True)
+
+    # reset default behaviour.
+    sim.sequencers[0].set_acquisition_mock_data(None)
 
 # Simulator output
 The simulator has some methods to show the simulator output.

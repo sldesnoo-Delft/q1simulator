@@ -1,10 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
-## \[0.4.1] - 2022-07-14
+## \[0.4.1] - 2022-07-19
 
 ### Added
 - Added handling of mixer_corr_gain_ratio and mixer_corr_phase_offset_degree to sequencer
+- Added set_acquisition_mock_data to sequencer
 
 ### Changed
 - plot output in V instead of raw DAC values

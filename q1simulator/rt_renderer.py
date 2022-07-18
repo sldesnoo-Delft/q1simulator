@@ -1,10 +1,14 @@
 import logging
 from copy import copy
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence, Iterable, Union
+from numbers import Number
+from collections.abc import Sequence as AbcSequence
 
 import numpy as np
 import matplotlib.pyplot as pt
+
+MockDataEntry = Union[float, complex, Sequence[float]]
 
 @dataclass
 class Settings:
@@ -53,13 +57,14 @@ class Renderer:
         self.out0 = []
         self.out1 = []
         self.acq_count = {
-                i:[0]*num_bins for i,num_bins in self.acq_bins.items()
+                i:np.zeros(num_bins, dtype=int) for i,num_bins in self.acq_bins.items()
                 }
         self.acq_data = {
-                i:[float('nan')]*num_bins for i,num_bins in self.acq_bins.items()
+                i:np.full((num_bins, 2), np.nan) for i,num_bins in self.acq_bins.items()
                 }
         self.acq_times = {i:[] for i in self.acq_bins}
         self.acq_buffer = AcqBuffer()
+        self.mock_data = {}
         self.errors = set()
 
     def path_enable(self, path, out, enable):
@@ -209,6 +214,24 @@ class Renderer:
         if len(self.path_out_enabled[1]):
             self.out1.append(data1)
 
+    def _get_acq_data(self, bins, default):
+        mock_data_iter = self.mock_data.get(bins, None)
+        if mock_data_iter is None:
+            return (default, default)
+        else:
+            try:
+                value = next(mock_data_iter)
+                if isinstance(value, complex):
+                    return (value.real, value.imag)
+                if isinstance(value, Number):
+                    return (value, value)
+                if isinstance(value, (AbcSequence, np.ndarray)):
+                    return (value[0], value[1])
+                raise ValueError(f"Incompatible mock data {value}")
+            except StopIteration:
+                self._error('OUT OF MOCK DATA')
+                return (np.nan, np.nan)
+
     def _add_acquisition(self, bins, bin_index):
         t = self.time
         if bins not in self.acq_bins:
@@ -220,10 +243,11 @@ class Renderer:
         elif not self.acq_buffer.add(t):
             self._error('ACQ BINNING FIFO ERROR')
         else:
+            value = self._get_acq_data(bins, t)
             if self.acq_count[bins][bin_index] == 0:
-                self.acq_data[bins][bin_index] = t
+                self.acq_data[bins][bin_index] = value
             else:
-                self.acq_data[bins][bin_index] += t
+                self.acq_data[bins][bin_index] += value
             self.acq_count[bins][bin_index] += 1
 
     def plot(self, v_max):
@@ -237,6 +261,9 @@ class Renderer:
         if len(self.path_out_enabled[1]):
             out1 = scaling * np.concatenate(self.out1)
             pt.plot(out1, label=f'{self.name}.{self.path_out_enabled[1]}')
+
+    def set_mock_data(self, bins, data: Iterable[Sequence[float]]):
+        self.mock_data[bins] = iter(data)
 
     def get_acquisition_data(self):
         return (self.acq_count, self.acq_data)

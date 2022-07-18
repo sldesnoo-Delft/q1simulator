@@ -1,14 +1,18 @@
 import logging
 from functools import partial
+from dataclasses import dataclass
 import json
 import numpy as np
+from typing import Optional, Iterator, Iterable
 
 from qcodes.instrument.channel import InstrumentChannel
 
 from .q1core import Q1Core
-from .rt_renderer import Renderer
+from .rt_renderer import Renderer, MockDataEntry
 
 from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
+
+MockDataType = Iterable[MockDataEntry]
 
 
 class Q1Sequencer(InstrumentChannel):
@@ -90,7 +94,7 @@ class Q1Sequencer(InstrumentChannel):
         self.waveforms = {}
         self.weights = {}
         self.acquisition_bins = {}
-
+        self._mock_data = {}
         self.run_state = 'IDLE'
         self.rt_renderer = Renderer(self.name)
         self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm)
@@ -161,6 +165,18 @@ class Q1Sequencer(InstrumentChannel):
             bins_dict[index] = num_bins
         self.rt_renderer.set_acquisition_bins(bins_dict)
 
+    def _set_rt_mock_data(self):
+        for name,md in self._mock_data.items():
+            if name not in self.acquisition_bins:
+                logging.warning(f"no acquisition_bins for mock_data '{name}'")
+                continue
+            try:
+                data = np.asarray(next(md))
+            except StopIteration:
+                raise Exception(f'No more mock data')
+            bin_num = int(self.acquisition_bins[name]['index'])
+            self.rt_renderer.set_mock_data(bin_num, data)
+
     def get_state(self):
         flags = list(self.q1core.errors | self.rt_renderer.errors)
         return SequencerState(
@@ -179,6 +195,7 @@ class Q1Sequencer(InstrumentChannel):
     def run(self):
         self.run_state = 'RUNNING'
         self.rt_renderer.reset()
+        self._set_rt_mock_data()
         self.q1core.run()
         self.run_state = 'STOPPED'
 
@@ -191,25 +208,101 @@ class Q1Sequencer(InstrumentChannel):
             index = int(datadict['index'])
             num_bins = int(datadict['num_bins'])
             acq_count = cnt[index]
-            path_data = [d/c if c > 0 else float('nan')
-                         for d,c in zip(data[index], cnt[index])]
+            path_data = data[index]
+            # TODO @@@ implement threshold
 
             result[name] = {
                 'index':index,
                 'acquisition':{
                     'bins':{
                         'integration': {
-                            'path0':path_data,
-                            'path1':path_data,
+                            'path0':list(path_data[:,0]),
+                            'path1':list(path_data[:,1]),
                             },
                         'threshold':[0.0]*num_bins,
-                        'avg_cnt':acq_count,
+                        'avg_cnt':list(acq_count),
                     }
                 }}
         return result
+
+    def set_acquisition_mock_data(self,
+                                  data: Optional[Iterable[MockDataType]],
+                                  name='default',
+                                  repeat=False):
+        '''
+        Sets mock acquisition data for 1 or more runs of the sequence.
+
+        `data` is a list with lists of values to use per run of the sequence.
+        The list for a run should have a length equal or bigger than
+        the number of acquire calls in the executed sequence.
+        The entry for an acquire call is used for both paths.
+        If it is a single float value then it is used for both paths.
+        If it is a complex value then the real part is used for path 0 and
+        the imaginary part for path 1.
+        If it is a sequence of two floats then the first is used for path 0
+        and the second for path 1.
+
+        Args:
+            data:
+                if None clears the data and resets default behavior,
+                otherwise list of mock data for every run of the sequence.
+            name: name of the acquisition
+            repeat:
+                if True repeatly cycles through the list of mock data,
+                otherwise an exception is raised when the list of mock data is exhausted.
+
+        Example:
+            # set data for 1 run to return the values 0 till 19 on path 0 and path 1
+            data = [np.arange(20)]
+            sim.sequencers[0].set_acquisition_mock_data(data)
+
+            # set data for every run to return IQ values with changing phase
+            # on path 0 and 1
+            data = [np.exp(np.pi*1j*np.arange(20)/10)]
+            sim.sequencers[0].set_acquisition_mock_data(data, repeat=True)
+
+            # set data for every run to return the values 0 till 19 on path 0
+            # and 100 till 119 on path 1.
+            data = [np.arange(20) + 1j*np.arange(100,120)]
+            sim.sequencers[0].set_acquisition_mock_data(data, repeat=True)
+
+            # set data for 2 runs to return the values 0 till 19 on the first run
+            # and 100 till 119 on the second run.
+            data2 = [np.arange(20), np.arange(100, 120)]
+            sim.sequencers[0].set_acquisition_mock_data(data2)
+
+            # Return 0...19 and 100...119 alternatingly.
+            sim.sequencers[0].set_acquisition_mock_data(data2, repeat=True)
+
+            # reset default behaviour.
+            sim.sequencers[0].set_acquisition_mock_data(None)
+        '''
+        if data is None and name in self._mock_data:
+            del self._mock_data[name]
+        else:
+            self._mock_data[name] = MockData(data, repeat)
 
     def plot(self):
         self.rt_renderer.plot(self._v_max)
 
     def print_registers(self, reg_nrs=None):
         self.q1core.print_registers(reg_nrs)
+
+
+@dataclass
+class MockData:
+    data: Iterable[MockDataType]
+    repeat: bool
+    data_iter: Iterator[MockDataType] = None
+
+    def __post_init__(self):
+        self.data_iter = iter(self.data)
+
+    def __next__(self):
+        try:
+            return next(self.data_iter)
+        except StopIteration:
+            if not self.repeat:
+                raise
+            self.data_iter = iter(self.data)
+            return next(self.data_iter)
