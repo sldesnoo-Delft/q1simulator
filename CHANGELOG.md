@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.4.2] - 2022-07-21
+
+### Added
+- Allow set sequence with dict argument
+
 ## \[0.4.1] - 2022-07-19
 
 ### Added
