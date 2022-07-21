@@ -126,9 +126,13 @@ class Q1Sequencer(InstrumentChannel):
         logging.debug(f'{self.name}: channel_map_path{path}_out{out}_en={value}')
         self.rt_renderer.path_enable(path, out, value)
 
-    def upload(self, file_name):
-        with open(file_name) as fp:
-            pdict = json.load(fp)
+    def upload(self, sequence):
+        if isinstance(sequence, str):
+            filename = sequence
+            with open(filename) as fp:
+                pdict = json.load(fp)
+        else:
+            pdict = sequence
         waveforms = pdict['waveforms']
         weights = pdict['weights']
         acquisitions = pdict['acquisitions']
