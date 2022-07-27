@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.4.3] - 2022-07-27
+
+### Fixed
+- Execution of sequence without wait_sync
+
 ## \[0.4.2] - 2022-07-21
 
 ### Added
