@@ -1,5 +1,6 @@
 import logging
 from functools import partial
+from typing import Optional
 
 import numpy as np
 import qcodes as qc
@@ -143,8 +144,9 @@ class Q1Simulator(qc.Instrument):
         self.armed_seq.add(seq_nr)
         self.sequencers[seq_nr].arm()
 
-    def start_sequencer(self):
-        for seq_nr in self.armed_seq:
+    def start_sequencer(self, sequencer: Optional[int] = None):
+        start_indices = self.armed_seq if sequencer is None else (sequencer,)
+        for seq_nr in start_indices:
             self.sequencers[seq_nr].run()
 
     def stop_sequencer(self):
