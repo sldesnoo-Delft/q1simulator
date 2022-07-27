@@ -133,6 +133,8 @@ class Q1Core:
         self.R = [0]*64
         self.iptr = 0
         self.clock = CoreClock()
+        # give the core a head start of 10 cycles
+        self.clock.add_ticks(-10)
 
         if len(self.instructions) == 0:
             print(f'*** No instructions loaded')
