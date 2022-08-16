@@ -437,8 +437,7 @@ class CoreClock:
         if time < self.core_time:
             print(f'*** Schedule {time:6} at {self.core_time:6} ***')
             raise Abort('Real time buffer underrun',
-                        'SEQUENCE PROCESSOR RT EXEC ILLEGAL INSTRUCTION')
-
+                        'SEQUENCE PROCESSOR RT EXEC COMMAND UNDERFLOW')
         b = self.buffer
         # remove executed entries.
         while len(b) and b[0] < self.core_time:

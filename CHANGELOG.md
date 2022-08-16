@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.4.4] - 2022-08-16
+
+### Added
+- Added state flag "SEQUENCE PROCESSOR RT EXEC COMMAND UNDERFLOW"
+
 ## \[0.4.3] - 2022-07-27
 
 ### Fixed
