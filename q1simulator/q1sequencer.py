@@ -79,6 +79,7 @@ class Q1Sequencer(InstrumentChannel):
         if self._is_qrm:
             self.add_parameter('demod_en_acq', set_cmd=self._set_demod_en_acq)
 
+        self._trace = False
         self.reset()
 
     def config(self, name, value):
@@ -90,6 +91,7 @@ class Q1Sequencer(InstrumentChannel):
         elif name == 'max_core_cycles':
             self.q1core.max_core_cycles = value
         elif name == 'trace':
+            self._trace = value
             self.rt_renderer.trace_enabled = value
 
     def reset(self):
@@ -99,6 +101,7 @@ class Q1Sequencer(InstrumentChannel):
         self._mock_data = {}
         self.run_state = 'IDLE'
         self.rt_renderer = Renderer(self.name)
+        self.rt_renderer.trace_enabled = self._trace
         self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm)
 
     def _log_set(self, name, value):
