@@ -27,11 +27,14 @@ class AsmSyntaxError(Exception):
 def evaluate_args(arg_types, *, dest_arg=None):
 
     def decorator_args(func):
+
+        types = arg_types.split(',') if arg_types else []
+
         @wraps(func)
         def func_wrapper(self, *args, **kwargs):
             try:
                 # print(f'{func.__name__} {args}')
-                args = self._evaluate_args(arg_types, dest_arg, args)
+                args = self._evaluate_args(types, dest_arg, args)
             except Exception as ex:
                 print(f'*** Exception: {ex}')
                 print(f'*** Error in instruction {func.__name__[1:]} {",".join(args)}')
@@ -116,7 +119,6 @@ class Q1Core:
         command = command.strip()
         # format: 'log "msg",register,options
         log_pattern = r'log "(.*)",(\w+)?,(\w+)?'
-        re.fullmatch(log_pattern, command)
         match = re.fullmatch(log_pattern, command)
         if match:
             msg = match.group(1)
@@ -184,9 +186,8 @@ class Q1Core:
     def _error(self, msg):
         self.errors.add(msg)
 
-    def _evaluate_args(self, arg_types, dest_arg, args):
+    def _evaluate_args(self, types, dest_arg, args):
         args = list(args)
-        types = arg_types.split(',') if arg_types else []
         if len(args) != len(types):
             raise AsmSyntaxError(f'Incorrect number of arguments {len(args)}<>{len(types)}')
         select_imm = False
