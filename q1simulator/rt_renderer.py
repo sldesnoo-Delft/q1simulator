@@ -46,6 +46,7 @@ class Renderer:
         self.mixer_gain_ratio = 1.0
         self.mixer_phase_offset_degree = 0.0
         self.reset()
+        self.trace_enabled = False
 
     def reset(self):
         self.settings = Settings()
@@ -108,6 +109,7 @@ class Renderer:
 
     def play(self, wave0, wave1, wait_after):
         self._update_settings()
+        self._trace(f'Play {wave0} {wave1}')
         if wave0 not in self.wavedict:
             self._error('AWG WAVE PLAYBACK INDEX INVALID PATH 0')
         elif wave1 not in self.wavedict:
@@ -122,11 +124,13 @@ class Renderer:
 
     def acquire(self, bins, bin_index, wait_after):
         self._update_settings()
+        self._trace(f'Acquire {bins} {bin_index}')
         self._add_acquisition(bins, bin_index)
         self._render(wait_after)
 
     def acquire_weighed(self, bins, bin_index, weight0, weight1, wait_after):
         self._update_settings()
+        self._trace(f'AcquireWeighed {bins} {bin_index} {weight0} {weight1}')
         if weight0 not in self.acq_weights:
             self._error('ACQ WEIGHT PLAYBACK INDEX INVALID PATH 0')
         elif weight1 not in self.acq_weights:
@@ -136,6 +140,7 @@ class Renderer:
         self._render(wait_after)
 
     def wait(self, time):
+        self._trace(f'Wait {time}')
         self._render(time)
 
     def wait_sync(self, wait_after):
@@ -147,6 +152,23 @@ class Renderer:
 
     def _update_settings(self):
         new = self.next_settings
+        old = self.settings
+        msg = []
+        if new.awg_gain0 != old.awg_gain0 or new.awg_gain1 != new.awg_gain1:
+            msg.append(f'awg_gain {new.awg_gain0},{new.awg_gain1}')
+        if new.awg_offs0 != old.awg_offs0 or new.awg_offs1 != new.awg_offs1:
+            msg.append(f'awg_offset {new.awg_offs0},{new.awg_offs1}')
+        if new.phase is not None:
+            phase = (new.phase - self.time * self.nco_frequency * 1e-9) % 1
+            self.nco_phase_offset = phase
+            msg.append(f'phase {new.phase}')
+        if new.phase_shift != 0.0:
+            msg.append(f'phase_shift {new.phase_shift}')
+        if new.marker != old.marker:
+            msg.append(f'marker {new.marker:04b}')
+        if len(msg) > 0:
+            self._trace('Update: ' + '; '.join(msg))
+
         if new.phase is not None:
             phase = (new.phase - self.time * self.nco_frequency * 1e-9) % 1
             self.nco_phase_offset = phase
@@ -249,6 +271,10 @@ class Renderer:
             else:
                 self.acq_data[bins][bin_index] += value
             self.acq_count[bins][bin_index] += 1
+
+    def _trace(self, msg):
+        if self.trace_enabled:
+            print(f'{self.time:-6} {msg}')
 
     def plot(self, v_max):
         scaling = v_max/2**15

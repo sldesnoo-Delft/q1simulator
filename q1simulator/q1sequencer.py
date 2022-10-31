@@ -89,6 +89,8 @@ class Q1Sequencer(InstrumentChannel):
             self.rt_renderer.max_render_time = value
         elif name == 'max_core_cycles':
             self.q1core.max_core_cycles = value
+        elif name == 'trace':
+            self.rt_renderer.trace_enabled = value
 
     def reset(self):
         self.waveforms = {}

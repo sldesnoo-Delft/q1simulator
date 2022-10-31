@@ -199,3 +199,4 @@ class Q1Simulator(qc.Instrument):
 
     def print_registers(self, seq_nr, reg_nrs=None):
         self.sequencers[seq_nr].print_registers(reg_nrs)
+
