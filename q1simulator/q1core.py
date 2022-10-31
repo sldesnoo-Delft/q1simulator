@@ -127,6 +127,12 @@ class Q1Core:
             if msg is None:
                 msg = ''
             return None,'log',(msg,register,options)
+        latch_pattern = r'set_latch (\d),\s*([01])'
+        match = re.fullmatch(latch_pattern, command)
+        if match:
+            reg = match.group(1)
+            value = match.group(2)
+            return None,'set_latch',(reg, value)
         print(f'Unknown simulator command:{command}')
         return None,None,None
 
@@ -404,6 +410,10 @@ class Q1Core:
     def _sw_req(self, value):
         raise NotImplementedError()
 
+    @evaluate_args('I,I,I,I')
+    def _set_cond(self, enable, mask, op, else_wait):
+        self.renderer.set_cond(enable, mask, op, else_wait)
+
     # ---- Simulator commands ----
 
     def _log(self, msg, reg, options):
@@ -424,6 +434,9 @@ class Q1Core:
             time_str = f' q1:{self.clock.core_time:6} rt:{self.renderer.time:6} ns'
         print(f'{msg}: {value_str}{time_str}')
 
+    @evaluate_args('I,I')
+    def _set_latch(self, reg, value):
+        self.renderer.set_latch(reg, value)
 
 class CoreClock:
     def __init__(self):

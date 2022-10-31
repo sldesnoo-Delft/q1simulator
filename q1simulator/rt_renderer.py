@@ -7,6 +7,7 @@ from collections.abc import Sequence as AbcSequence
 
 import numpy as np
 import matplotlib.pyplot as pt
+from functools import wraps
 
 MockDataEntry = Union[float, complex, Sequence[float]]
 
@@ -30,6 +31,17 @@ def float2int16array(value):
 
 def _i16(value):
     return np.int16(value)
+
+def check_conditional(func):
+    @wraps(func)
+    def func_wrapper(self, *args, **kwargs):
+        if self.skip_rt:
+            self._else_wait()
+        else:
+            func(self, *args, **kwargs)
+
+    return func_wrapper
+
 
 class Renderer:
 
@@ -67,6 +79,9 @@ class Renderer:
         self.acq_buffer = AcqBuffer()
         self.mock_data = {}
         self.errors = set()
+        self.latch_regs = [0]*16
+        self.skip_rt = False
+        self.else_wait = 0
 
     def path_enable(self, path, out, enable):
         if enable:
@@ -103,10 +118,12 @@ class Renderer:
         self.next_settings.awg_offs0 = offset0
         self.next_settings.awg_offs1 = offset1
 
+    @check_conditional
     def upd_param(self, wait_after):
         self._update_settings()
         self._render(wait_after)
 
+    @check_conditional
     def play(self, wave0, wave1, wait_after):
         self._update_settings()
         self._trace(f'Play {wave0} {wave1}')
@@ -122,12 +139,14 @@ class Renderer:
                               self.time + len(self.waves[1]))
         self._render(wait_after)
 
+    @check_conditional
     def acquire(self, bins, bin_index, wait_after):
         self._update_settings()
         self._trace(f'Acquire {bins} {bin_index}')
         self._add_acquisition(bins, bin_index)
         self._render(wait_after)
 
+    @check_conditional
     def acquire_weighed(self, bins, bin_index, weight0, weight1, wait_after):
         self._update_settings()
         self._trace(f'AcquireWeighed {bins} {bin_index} {weight0} {weight1}')
@@ -139,12 +158,35 @@ class Renderer:
             self._add_acquisition(bins, bin_index)
         self._render(wait_after)
 
+    @check_conditional
     def wait(self, time):
         self._trace(f'Wait {time}')
         self._render(time)
 
     def wait_sync(self, wait_after):
         self._render(wait_after)
+
+    def set_cond(self, enable, mask, op, else_wait):
+        if not enable:
+            self.skip_rt = False
+            return
+        reg_value = 0
+        for i,bit in enumerate(self.latch_regs):
+            reg_value += bit << i
+        if op == 1: # AND
+            match = (reg_value & mask) == mask
+        elif op == 2: # OR
+            match = (reg_value & mask) != 0
+        else:
+            raise Exception(f'Unknown operator {op}')
+        self.skip_rt = not match
+        self.else_wait = else_wait
+
+    def set_latch(self, reg, value):
+        self.latch_regs[reg] = value
+
+    def _else_wait(self, *args, **kwargs):
+        self._render(self.else_wait)
 
     def _error(self, msg):
         logging.error(f'{self.name}: {msg}')
