@@ -102,6 +102,9 @@ class Q1Simulator(qc.Instrument):
             self.in0_gain(0)
             self.in1_gain(0)
 
+    def get_idn(self):
+        return dict(vendor='Q1Simulator', model=self._sim_type, serial='', firmware='')
+
     @property
     def instrument_class(self):
         return InstrumentClass.PULSAR
