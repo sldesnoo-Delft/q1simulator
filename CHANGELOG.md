@@ -1,10 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
-## \[0.4.5] - 2022-11-@@
+## \[0.4.6] - 2022-11-@@
 
 ### Added
-- Add get_idn()
+- Added get_idn()
+- Added tracing of rt statements
 
 ## \[0.4.4] - 2022-08-16
 
