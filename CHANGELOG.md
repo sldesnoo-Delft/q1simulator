@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
-## \[0.4.6] - 2022-11-@@
+## \[0.4.6] - 2022-11-07
 
 ### Added
 - Added get_idn()
