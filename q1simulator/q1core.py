@@ -82,7 +82,7 @@ class Q1Core:
             raise
 
         duration = time.perf_counter() - start
-        print(f'Duration {duration*1000:5.1f} ms {cntr} instructions, {duration/cntr*1e6:4.1f} us/instr', flush=True)
+        logging.info(f'Duration {duration*1000:5.1f} ms {cntr} instructions, {duration/cntr*1e6:4.1f} us/instr')
 
 
     def _print_error_msg(self, msg, instr, cntr):
