@@ -234,6 +234,13 @@ class Q1Sequencer(InstrumentChannel):
                 }}
         return result
 
+    def delete_acquisition_data(self, name='', all=False):
+        if all:
+            self.rt_renderer.delete_acquisition_data_all()
+        else:
+            index = self.acquisition_bins[name]['index']
+            self.rt_renderer.delete_acquisition_data(index)
+
     def set_acquisition_mock_data(self,
                                   data: Optional[Iterable[MockDataType]],
                                   name='default',

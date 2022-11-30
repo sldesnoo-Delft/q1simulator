@@ -57,12 +57,6 @@ class Renderer:
         self.waves = (None, None)
         self.out0 = []
         self.out1 = []
-        self.acq_count = {
-                i:np.zeros(num_bins, dtype=int) for i,num_bins in self.acq_bins.items()
-                }
-        self.acq_data = {
-                i:np.full((num_bins, 2), np.nan) for i,num_bins in self.acq_bins.items()
-                }
         self.acq_times = {i:[] for i in self.acq_bins}
         self.acq_buffer = AcqBuffer()
         self.mock_data = {}
@@ -82,6 +76,7 @@ class Renderer:
 
     def set_acquisition_bins(self, acq_bins):
         self.acq_bins = acq_bins
+        self.delete_acquisition_data_all()
 
     def set_mrk(self, value):
         self.next_settings.marker = value
@@ -253,6 +248,17 @@ class Renderer:
             except StopIteration:
                 self._error('OUT OF MOCK DATA')
                 return (np.nan, np.nan)
+
+    def delete_acquisition_data_all(self):
+        self.acq_count = {}
+        self.acq_data = {}
+        for index in self.acq_bins:
+            self.delete_acquisition_data(index)
+
+    def delete_acquisition_data(self, index):
+        num_bins = self.acq_bins[index]
+        self.acq_count[index] = np.zeros(num_bins, dtype=int)
+        self.acq_data[index] = np.full((num_bins, 2), np.nan)
 
     def _add_acquisition(self, bins, bin_index):
         t = self.time

@@ -164,6 +164,9 @@ class Q1Simulator(qc.Instrument):
     def get_acquisitions(self, seq_nr, timeout=0):
         return self.sequencers[seq_nr].get_acquisition_data()
 
+    def delete_acquisition_data(self, seq_nr, name='', all=False):
+        self.sequencers[seq_nr].delete_acquisition_data(name=name, all=all)
+
     def config_seq(self, seq_nr, name, value):
         self.sequencers[seq_nr].config(name, value)
 
