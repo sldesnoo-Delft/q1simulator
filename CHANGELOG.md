@@ -5,6 +5,7 @@ All notable changes to Q1Simulator will be documented in this file.
 
 - Aligned version with qblox-instruments version
 - Added `delete_acquisition_data` to module
+- Improved performance with 20...40%
 
 ## \[0.4.6] - 2022-11-07
 
