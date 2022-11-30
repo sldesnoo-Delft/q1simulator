@@ -45,6 +45,7 @@ class Renderer:
         self.nco_phase_offset = 0.0
         self.mixer_gain_ratio = 1.0
         self.mixer_phase_offset_degree = 0.0
+        self.delete_acquisition_data_all()
         self.reset()
         self.trace_enabled = False
 
