@@ -137,6 +137,12 @@ class Q1Simulator(qc.Instrument):
         seq_nr = int(name[9])
         self.sequencers[seq_nr]._set_legacy(name[11:], value)
 
+    def get_num_system_error(self):
+        return 0
+
+    def get_system_error(self):
+        return '0,"No error"'
+
     def get_system_state(self):
         return SystemState(
             SystemStatus.OKAY,
@@ -152,7 +158,7 @@ class Q1Simulator(qc.Instrument):
         for seq_nr in start_indices:
             self.sequencers[seq_nr].run()
 
-    def stop_sequencer(self):
+    def stop_sequencer(self, sequencer: Optional[int] = None):
         self.armed_seq = set()
 
     def get_sequencer_state(self, seq_nr, timeout=0):
