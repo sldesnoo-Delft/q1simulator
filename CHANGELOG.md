@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
-## \[0.7.0] - 2022-@@@@
+## \[0.7.0] - 2022-12-02
 
 - Aligned version with qblox-instruments version
 - Added `delete_acquisition_data` to module
