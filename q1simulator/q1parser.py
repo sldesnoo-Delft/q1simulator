@@ -37,8 +37,9 @@ mnemonic_args = {
     'asr': 'R,IR,D',
     'set_mrk': 'IR',
     'reset_ph': '',
-    'set_ph': 'IR,IR,IR',
-    'set_ph_delta': 'IR,IR,IR',
+    'set_freq': 'IR',
+    'set_ph': 'IR',
+    'set_ph_delta': 'IR',
     'set_awg_gain': 'IR,IR',
     'set_awg_offs': 'IR,IR',
     'upd_param': 'I',
@@ -51,30 +52,6 @@ mnemonic_args = {
     'sw_req': 'IR',
     }
 
-
-
-#def evaluate_args(arg_types, *, dest_arg=None):
-#
-#    def decorator_args(func):
-#
-#        types = arg_types.split(',') if arg_types else []
-#
-#        @wraps(func)
-#        def func_wrapper(self, *args, **kwargs):
-#            try:
-#                # print(f'{func.__name__} {args}')
-#                args = self._evaluate_args(types, dest_arg, args)
-#            except Exception as ex:
-#                print(f'*** Exception: {ex}')
-#                print(f'*** Error in instruction {func.__name__[1:]} {",".join(args)}')
-#                print(f'*** Argument types: ({arg_types})')
-#                raise
-#            return func(self, *args)
-#
-#        return func_wrapper
-#
-#    return decorator_args
-#
 
 class Q1Parser:
 

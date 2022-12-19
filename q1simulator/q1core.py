@@ -178,17 +178,21 @@ class Q1Core:
         self.clock.add_ticks(1)
         self.renderer.set_mrk(value)
 
+    def _set_freq(self, freq):
+        self.clock.add_ticks(1)
+        self.renderer.set_freq(freq)
+
     def _reset_ph(self):
         self.clock.add_ticks(1)
         self.renderer.reset_ph()
 
-    def _set_ph(self, arg0, arg1, arg2):
+    def _set_ph(self, phase):
         self.clock.add_ticks(1)
-        self.renderer.set_ph(arg0, arg1, arg2)
+        self.renderer.set_ph(phase)
 
-    def _set_ph_delta(self, arg0, arg1, arg2):
+    def _set_ph_delta(self, phase_delta):
         self.clock.add_ticks(1)
-        self.renderer.set_ph_delta(arg0, arg1, arg2)
+        self.renderer.set_ph_delta(phase_delta)
 
     def _set_awg_gain(self, gain0, gain1):
         self.clock.add_ticks(1)

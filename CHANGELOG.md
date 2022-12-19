@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.8.0] - 2022-12-19
+
+- Update to qblox_instruments v0.8
+- Added set_freq
+- Changed arguments set_ph, set_ph_delta
+- Added version check
+
 ## \[0.7.0] - 2022-12-02
 
 - Aligned version with qblox-instruments version

@@ -6,6 +6,7 @@ import numpy as np
 import qcodes as qc
 
 from .q1sequencer import Q1Sequencer
+from .qblox_version import check_qblox_instrument_version
 
 from qblox_instruments import (
         SystemStatus, SystemState, SystemStatusSlotFlags,
@@ -67,6 +68,7 @@ class Q1Simulator(qc.Instrument):
 
     def __init__(self, name, n_sequencers=6, sim_type=None):
         super().__init__(name)
+        check_qblox_instrument_version()
         self._sim_type = sim_type
         if sim_type is None:
             raise Exception('sim_type must be specified')

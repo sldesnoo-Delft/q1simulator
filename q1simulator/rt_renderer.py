@@ -19,11 +19,24 @@ class Settings:
     awg_gain1 : int = 0
     phase: Optional[float] = None
     phase_shift : float = 0
+    frequency : Optional[float] = None
 
-def _phase2float(arg0, arg1, arg2):
-    phase = ((arg2/6250 + arg1)/400 + arg0)/400
-#    print(f'Phase {phase:6.3f}')
+def _phase2float(phase_uint32):
+    # phase in rotations, i.e. unit = 2 pi rad
+    phase = phase_uint32/1e9
+    # print(f'Phase {phase:9.6f} rotations ({phase*360:8.3f} deg)')
     return phase
+
+def _freq2Hz(freq_uint32):
+    # freq in Hz
+    # convert uint to int if value > 2**31
+    if freq_uint32 > 2**31:
+        freq_int32 = freq_uint32 - 2**32
+    else:
+        freq_int32 = freq_uint32
+    freq = freq_int32/4
+    # print(f'Frequency {freq/1e6:9.6f} MHz')
+    return freq
 
 def float2int16array(value):
     return np.array(value*2**15, dtype=np.int32)
@@ -82,14 +95,17 @@ class Renderer:
     def set_mrk(self, value):
         self.next_settings.marker = value
 
+    def set_freq(self, freq):
+        self.next_settings.frequency =_freq2Hz(freq)
+
     def reset_ph(self):
         self.next_settings.phase = 0.0
 
-    def set_ph(self, arg0, arg1, arg2):
-        self.next_settings.phase = _phase2float(arg0, arg1, arg2)
+    def set_ph(self, phase):
+        self.next_settings.phase = _phase2float(phase)
 
-    def set_ph_delta(self, arg0, arg1, arg2):
-        self.next_settings.phase_shift = _phase2float(arg0, arg1, arg2)
+    def set_ph_delta(self, phase_delta):
+        self.next_settings.phase_shift = _phase2float(phase_delta)
 
     def set_awg_gain(self, gain0, gain1):
         self.next_settings.awg_gain0 = gain0
@@ -168,12 +184,17 @@ class Renderer:
         if new.phase is not None:
             phase = (new.phase - self.time * self.nco_frequency * 1e-9) % 1
             self.nco_phase_offset = phase
+            self.next_settings.phase = None
+        if new.frequency is not None:
+            phase = (self.nco_phase_offset + self.time * self.nco_frequency * 1e-9) % 1
+            new_phase_offset = phase - (self.time * new.frequency * 1e-9) % 1
+            self.nco_phase_offset = new_phase_offset
+            self.nco_frequency = new.frequency
+            self.next_settings.frquency = None
         self.nco_phase_offset += new.phase_shift
-        self.settings = self.next_settings
-        self.settings.phase = None
-        self.next_settings = copy(self.settings)
-        self.next_settings.phase = None
-        self.next_settings.phase_shift = 0.0
+        new.phase_shift = 0.0
+        # copy offset and gain
+        self.settings = copy(self.next_settings)
 
     def _render(self, time):
         if time & 0x0003:
