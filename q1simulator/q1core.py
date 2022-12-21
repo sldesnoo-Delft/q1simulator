@@ -1,3 +1,4 @@
+from collections import deque
 import time
 import logging
 
@@ -265,7 +266,7 @@ class Q1Core:
 
 class CoreClock:
     def __init__(self):
-        self.buffer = []
+        self.rt_buffer = deque()
         self.core_time = 0
 
     def add_ticks(self, value):
@@ -273,20 +274,24 @@ class CoreClock:
 
     def schedule_rt(self, time):
         # print(f'Sched {time:6} at {self.core_time:6}')
-        if time < self.core_time:
+        core_time = self.core_time
+        if time < core_time:
+            # rt command is already in the past w.r.t. the q1core time
             print(f'*** Schedule {time:6} at {self.core_time:6} ***')
             raise Abort('Real time buffer underrun',
                         'SEQUENCE PROCESSOR RT EXEC COMMAND UNDERFLOW')
-        b = self.buffer
-        # remove executed entries.
-        while len(b) and b[0] < self.core_time:
-            b.pop(0)
+        b = self.rt_buffer
+        try:
+            # remove executed rt entries.
+            while b[0] < core_time:
+                b.popleft()
+        except: pass
+
         # q1core halts when buffer is full
         if len(b) >= 16:
             # q1core will continue when an instruction is read from buffer.
             # When q1core continues the time advantage is `time` - popped time.
             # So, core time will be equal to popped time
-            # print(f'Stall {self.core_time} -> {b[0]}')
-            self.core_time = b.pop(0)
+            self.core_time = b.popleft()
 
-        self.buffer.append(time)
+        self.rt_buffer.append(time)
