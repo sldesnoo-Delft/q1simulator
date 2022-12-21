@@ -111,7 +111,7 @@ class Renderer:
         self.next_settings.reset_phase = True
 
     def set_ph(self, phase):
-        self.next_settings.phase = _phase2float(phase)
+        self.next_settings.relative_phase = _phase2float(phase)
 
     def set_ph_delta(self, phase_delta):
         self.next_settings.phase_shift = _phase2float(phase_delta)
@@ -195,17 +195,19 @@ class Renderer:
             if len(msg) > 0:
                 self._trace('Update: ' + '; '.join(msg))
 
-        if new.phase is not None:
-            phase = (new.phase - self.time * self.nco_frequency * 1e-9) % 1
-            self.nco_phase_offset = phase
-            self.next_settings.phase = None
+        if new.relative_phase is not None:
+            self.relative_phase = new.relative_phase
+            new.relative_phase = None
+        if new.reset_phase:
+            self.nco_phase_offset = (-self.time * self.nco_frequency * 1e-9) % 1
+            new.reset_phase = False
         if new.frequency is not None:
             phase = (self.nco_phase_offset + self.time * self.nco_frequency * 1e-9) % 1
             new_phase_offset = phase - (self.time * new.frequency * 1e-9) % 1
             self.nco_phase_offset = new_phase_offset
             self.nco_frequency = new.frequency
-            self.next_settings.frquency = None
-        self.nco_phase_offset += new.phase_shift
+            new.frequency = None
+        self.delta_phase += new.phase_shift
         new.phase_shift = 0.0
         # copy offset and gain
         self.settings = copy(self.next_settings)

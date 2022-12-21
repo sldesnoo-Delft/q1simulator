@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
-## \[0.8.0] - 2022-12-19
+## \[0.8.0] - 2022-12-22
 
 - Update to qblox_instruments v0.8
 - Added set_freq
