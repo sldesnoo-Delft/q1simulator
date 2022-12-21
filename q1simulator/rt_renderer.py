@@ -17,7 +17,8 @@ class Settings:
     awg_offs1 : int = 0
     awg_gain0 : int = 0
     awg_gain1 : int = 0
-    phase: Optional[float] = None
+    reset_phase : bool = False
+    relative_phase: Optional[float] = None
     phase_shift : float = 0
 
 def _phase2float(arg0, arg1, arg2):
@@ -36,13 +37,13 @@ class Renderer:
     def __init__(self, name):
         self.name = name
         self.max_render_time = 2_000_000
+        self.wavedict_float = {}
         self.wavedict = {}
         self.acq_weights = {}
         self.acq_bins = {}
         self.path_out_enabled = [set(), set()]
         self.nco_frequency = 0.0
         self.mod_en_awg = False
-        self.nco_phase_offset = 0.0
         self.mixer_gain_ratio = 1.0
         self.mixer_phase_offset_degree = 0.0
         self.delete_acquisition_data_all()
@@ -53,6 +54,10 @@ class Renderer:
         self.settings = Settings()
         self.next_settings = Settings()
         self.time = 0
+        # Qblox sequencer has 3 different phase registers
+        self.nco_phase_offset = 0.0
+        self.relative_phase = 0.0
+        self.delta_phase = 0.0
         self.wave_start = 0
         self.waves_end = (0,0)
         self.waves = (None, None)
@@ -70,7 +75,11 @@ class Renderer:
             self.path_out_enabled[path].discard(out)
 
     def set_waveforms(self, wavedict):
-        self.wavedict = wavedict
+        self.wavedict_float = wavedict
+        self.wavedict = {
+                key:float2int16array(value)
+                for key,value in wavedict.items()
+                }
 
     def set_weights(self, weightsdict):
         self.acq_weights = weightsdict
@@ -83,10 +92,10 @@ class Renderer:
         self.next_settings.marker = value
 
     def reset_ph(self):
-        self.next_settings.phase = 0.0
+        self.next_settings.reset_phase = True
 
     def set_ph(self, arg0, arg1, arg2):
-        self.next_settings.phase = _phase2float(arg0, arg1, arg2)
+        self.next_settings.relative_phase = _phase2float(arg0, arg1, arg2)
 
     def set_ph_delta(self, arg0, arg1, arg2):
         self.next_settings.phase_shift = _phase2float(arg0, arg1, arg2)
@@ -105,28 +114,30 @@ class Renderer:
 
     def play(self, wave0, wave1, wait_after):
         self._update_settings()
-        self._trace(f'Play {wave0} {wave1}')
+        if self.trace_enabled:
+            self._trace(f'Play {wave0} {wave1}')
         if wave0 not in self.wavedict:
             self._error('AWG WAVE PLAYBACK INDEX INVALID PATH 0')
         elif wave1 not in self.wavedict:
             self._error('AWG WAVE PLAYBACK INDEX INVALID PATH 1')
         else:
             self.wave_start = self.time
-            self.waves = (float2int16array(self.wavedict[wave0]),
-                          float2int16array(self.wavedict[wave1]))
+            self.waves = (self.wavedict[wave0], self.wavedict[wave1])
             self.waves_end = (self.time + len(self.waves[0]),
                               self.time + len(self.waves[1]))
         self._render(wait_after)
 
     def acquire(self, bins, bin_index, wait_after):
         self._update_settings()
-        self._trace(f'Acquire {bins} {bin_index}')
+        if self.trace_enabled:
+            self._trace(f'Acquire {bins} {bin_index}')
         self._add_acquisition(bins, bin_index)
         self._render(wait_after)
 
     def acquire_weighed(self, bins, bin_index, weight0, weight1, wait_after):
         self._update_settings()
-        self._trace(f'AcquireWeighed {bins} {bin_index} {weight0} {weight1}')
+        if self.trace_enabled:
+            self._trace(f'AcquireWeighed {bins} {bin_index} {weight0} {weight1}')
         if weight0 not in self.acq_weights:
             self._error('ACQ WEIGHT PLAYBACK INDEX INVALID PATH 0')
         elif weight1 not in self.acq_weights:
@@ -136,7 +147,8 @@ class Renderer:
         self._render(wait_after)
 
     def wait(self, time):
-        self._trace(f'Wait {time}')
+        if self.trace_enabled:
+            self._trace(f'Wait {time}')
         self._render(time)
 
     def wait_sync(self, wait_after):
@@ -149,37 +161,41 @@ class Renderer:
     def _update_settings(self):
         new = self.next_settings
         old = self.settings
-        msg = []
-        if new.awg_gain0 != old.awg_gain0 or new.awg_gain1 != new.awg_gain1:
-            msg.append(f'awg_gain {new.awg_gain0},{new.awg_gain1}')
-        if new.awg_offs0 != old.awg_offs0 or new.awg_offs1 != new.awg_offs1:
-            msg.append(f'awg_offset {new.awg_offs0},{new.awg_offs1}')
-        if new.phase is not None:
-            phase = (new.phase - self.time * self.nco_frequency * 1e-9) % 1
-            self.nco_phase_offset = phase
-            msg.append(f'phase {new.phase}')
-        if new.phase_shift != 0.0:
-            msg.append(f'phase_shift {new.phase_shift}')
-        if new.marker != old.marker:
-            msg.append(f'marker {new.marker:04b}')
-        if len(msg) > 0:
-            self._trace('Update: ' + '; '.join(msg))
 
-        if new.phase is not None:
-            phase = (new.phase - self.time * self.nco_frequency * 1e-9) % 1
-            self.nco_phase_offset = phase
-        self.nco_phase_offset += new.phase_shift
-        self.settings = self.next_settings
-        self.settings.phase = None
-        self.next_settings = copy(self.settings)
-        self.next_settings.phase = None
-        self.next_settings.phase_shift = 0.0
+        if self.trace_enabled:
+            msg = []
+            if new.awg_gain0 != old.awg_gain0 or new.awg_gain1 != old.awg_gain1:
+                msg.append(f'awg_gain {new.awg_gain0},{new.awg_gain1}')
+            if new.awg_offs0 != old.awg_offs0 or new.awg_offs1 != old.awg_offs1:
+                msg.append(f'awg_offset {new.awg_offs0},{new.awg_offs1}')
+            if new.reset_phase:
+                msg.append('reset_phase')
+            if new.relative_phase is not None:
+                msg.append(f'relative phase {new.relative_phase}')
+            if new.phase_shift != 0.0:
+                msg.append(f'add delta phase {new.phase_shift}')
+            if new.marker != old.marker:
+                msg.append(f'marker {new.marker:04b}')
+            if len(msg) > 0:
+                self._trace('Update: ' + '; '.join(msg))
+
+        if new.relative_phase is not None:
+            self.relative_phase = new.relative_phase
+            new.relative_phase = None
+        if new.reset_phase:
+            self.nco_phase_offset = (-self.time * self.nco_frequency * 1e-9) % 1
+            new.reset_phase = False
+        self.delta_phase += new.phase_shift
+        new.phase_shift = 0.0
+        # copy offset and gain
+        self.settings = copy(self.next_settings)
 
     def _render(self, time):
         if time & 0x0003:
             logging.error(f'{self.name}: wait time not aligned on '
                           f'4 ns boundary: {time} ns (offset={time&0x03} ns)')
             self._error('TIME NOT ALIGNED')
+
         # 16 bits, 4 ns resolution
         time &= 0xFFFC
         t_start = self.time
@@ -210,7 +226,10 @@ class Renderer:
 
         if self.mod_en_awg:
             t = np.arange(t_start, t_end)
-            phase = (2*np.pi*self.nco_phase_offset + 2*np.pi*self.nco_frequency * 1e-9 * t)
+            phase_offset = self.relative_phase + self.delta_phase
+            if self.nco_frequency < 0:
+                phase_offset = -phase_offset
+            phase = 2*np.pi*(phase_offset + self.nco_phase_offset + self.nco_frequency * 1e-9 * t)
             lo = np.cos(phase) + 1j*np.sin(phase)
             data0 = lo.real*path0 - lo.imag*path1
             if self.mixer_phase_offset_degree != 0.0:

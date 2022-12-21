@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.7.1] - 2022-12-21
+
+- Improved performance with ~50%
+- Changed reset_ph, set_ph, and set_ph_delta to match Qblox hardware
+
 ## \[0.7.0] - 2022-12-02
 
 - Aligned version with qblox-instruments version
