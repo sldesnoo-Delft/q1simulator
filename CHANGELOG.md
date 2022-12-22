@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.8.1] - 2022-12-22
+
+- Changed reset_ph to better match Qblox firmware 0.3.0.
+
 ## \[0.8.0] - 2022-12-22
 
 - Update to qblox_instruments v0.8

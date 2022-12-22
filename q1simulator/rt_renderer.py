@@ -195,12 +195,15 @@ class Renderer:
             if len(msg) > 0:
                 self._trace('Update: ' + '; '.join(msg))
 
-        if new.relative_phase is not None:
-            self.relative_phase = new.relative_phase
-            new.relative_phase = None
         if new.reset_phase:
             self.nco_phase_offset = (-self.time * self.nco_frequency * 1e-9) % 1
             new.reset_phase = False
+            # reset also resets the 2 other phase registers.
+            self.relative_phase = 0.0
+            self.delta_phase = 0.0
+        if new.relative_phase is not None:
+            self.relative_phase = new.relative_phase
+            new.relative_phase = None
         if new.frequency is not None:
             phase = (self.nco_phase_offset + self.time * self.nco_frequency * 1e-9) % 1
             new_phase_offset = phase - (self.time * new.frequency * 1e-9) % 1
