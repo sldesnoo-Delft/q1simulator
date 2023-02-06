@@ -13,6 +13,7 @@ from qblox_instruments import (
         InstrumentClass, InstrumentType,
         )
 
+logger = logging.getLogger(__name__)
 
 class Q1Simulator(qc.Instrument):
     _sim_parameters_qcm = [
@@ -133,7 +134,7 @@ class Q1Simulator(qc.Instrument):
             seq.reset()
 
     def _set(self, name, value):
-        logging.info(f'{self.name}:{name}={value}')
+        logger.info(f'{self.name}:{name}={value}')
 
     def _seq_set(self, name, value):
         seq_nr = int(name[9])

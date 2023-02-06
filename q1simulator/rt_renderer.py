@@ -8,6 +8,8 @@ from collections.abc import Sequence as AbcSequence
 import numpy as np
 import matplotlib.pyplot as pt
 
+logger = logging.getLogger(__name__)
+
 MockDataEntry = Union[float, complex, Sequence[float]]
 
 @dataclass
@@ -41,7 +43,7 @@ def _freq2Hz(freq_uint32):
 
 def float2int16array(value):
     # TODO: check on float < -1.0 or > +1.0
-    # Scale to 16 bit value, but store in 32 bit to avoid 
+    # Scale to 16 bit value, but store in 32 bit to avoid
     # overflow on later operations.
     return np.array(value*2**15, dtype=np.int32)
 
@@ -174,7 +176,7 @@ class Renderer:
         self._render(wait_after)
 
     def _error(self, msg):
-        logging.error(f'{self.name}: {msg}')
+        logger.error(f'{self.name}: {msg}')
         self.errors.add(msg)
 
     def _update_settings(self):
@@ -220,7 +222,7 @@ class Renderer:
 
     def _render(self, time):
         if time & 0x0003:
-            logging.error(f'{self.name}: wait time not aligned on '
+            logger.error(f'{self.name}: wait time not aligned on '
                           f'4 ns boundary: {time} ns (offset={time&0x03} ns)')
             self._error('TIME NOT ALIGNED')
 

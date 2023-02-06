@@ -4,6 +4,8 @@ import logging
 
 from .q1parser import Q1Parser
 
+logger = logging.getLogger(__name__)
+
 class Halt(Exception):
     pass
 
@@ -68,7 +70,7 @@ class Q1Core:
                                 'FORCED STOP')
         except Halt:
             rt_time_us = self.renderer.time / 1000
-            logging.info(f'{self.name}: stopped ({cntr} cycles, {rt_time_us:7.3f} us)')
+            logger.info(f'{self.name}: stopped ({cntr} cycles, {rt_time_us:7.3f} us)')
         except Illegal as ex:
             msg = f'Illegal instruction at line {self.iptr}: {ex}'
             self._print_error_msg(msg, instr, cntr)
@@ -83,7 +85,7 @@ class Q1Core:
             raise
 
         duration = time.perf_counter() - start
-        logging.info(f'Duration {duration*1000:5.1f} ms {cntr} instructions, {duration/cntr*1e6:4.1f} us/instr')
+        logger.info(f'Duration {duration*1000:5.1f} ms {cntr} instructions, {duration/cntr*1e6:4.1f} us/instr')
 
 
     def _print_error_msg(self, msg, instr, cntr):

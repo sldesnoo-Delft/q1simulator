@@ -12,6 +12,8 @@ from .rt_renderer import Renderer, MockDataEntry
 
 from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
 
+logger = logging.getLogger(__name__)
+
 MockDataType = Iterable[MockDataEntry]
 
 
@@ -105,30 +107,30 @@ class Q1Sequencer(InstrumentChannel):
         self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm)
 
     def _log_set(self, name, value):
-        logging.info(f'{self.name}: {name}={value}')
+        logger.info(f'{self.name}: {name}={value}')
 
     def _set_mod_en_awg(self, value):
-        logging.debug(f'{self.name}: mod_en_awg={value}')
+        logger.debug(f'{self.name}: mod_en_awg={value}')
         self.rt_renderer.mod_en_awg = value
 
     def _set_nco_freq(self, value):
-        logging.info(f'{self.name}: nco_freq={value}')
+        logger.info(f'{self.name}: nco_freq={value}')
         self.rt_renderer.nco_frequency = value
 
     def _set_demod_en_acq(self, value):
-        logging.debug(f'{self.name}: demod_en_acq={value}')
+        logger.debug(f'{self.name}: demod_en_acq={value}')
         self.rt_renderer.demod_en_acq = value
 
     def _set_mixer_gain_ratio(self, value):
-        logging.debug(f'{self.name}: mixer_gain_ratio={value}')
+        logger.debug(f'{self.name}: mixer_gain_ratio={value}')
         self.rt_renderer.mixer_gain_ratio = value
 
     def _set_mixer_phase_offset_degree(self, value):
-        logging.debug(f'{self.name}: mixer_phase_offset_degree={value}')
+        logger.debug(f'{self.name}: mixer_phase_offset_degree={value}')
         self.rt_renderer.mixer_phase_offset_degree = value
 
     def _set_channel_map_path_en(self, path, out, value):
-        logging.debug(f'{self.name}: channel_map_path{path}_out{out}_en={value}')
+        logger.debug(f'{self.name}: channel_map_path{path}_out{out}_en={value}')
         self.rt_renderer.path_enable(path, out, value)
 
     def upload(self, sequence):
@@ -177,7 +179,7 @@ class Q1Sequencer(InstrumentChannel):
     def _set_rt_mock_data(self):
         for name,md in self._mock_data.items():
             if name not in self.acquisition_bins:
-                logging.warning(f"no acquisition_bins for mock_data '{name}'")
+                logger.warning(f"no acquisition_bins for mock_data '{name}'")
                 continue
             try:
                 data = np.asarray(next(md))
@@ -243,9 +245,9 @@ class Q1Sequencer(InstrumentChannel):
 
     def start_adc_calib(self):
         if self._is_qrm:
-            logging.info('Calibrate ADC')
+            logger.info('Calibrate ADC')
         else:
-            logging.error("QCM does not have method 'start_adc_calib'")
+            logger.error("QCM does not have method 'start_adc_calib'")
 
     def set_acquisition_mock_data(self,
                                   data: Optional[Iterable[MockDataType]],
