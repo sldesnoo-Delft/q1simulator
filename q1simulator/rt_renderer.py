@@ -40,6 +40,9 @@ def _freq2Hz(freq_uint32):
     return freq
 
 def float2int16array(value):
+    # TODO: check on float < -1.0 or > +1.0
+    # Scale to 16 bit value, but store in 32 bit to avoid 
+    # overflow on later operations.
     return np.array(value*2**15, dtype=np.int32)
 
 def _i16(value):
