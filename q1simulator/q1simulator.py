@@ -176,6 +176,12 @@ class Q1Simulator(qc.Instrument):
     def delete_acquisition_data(self, seq_nr, name='', all=False):
         self.sequencers[seq_nr].delete_acquisition_data(name=name, all=all)
 
+    def start_adc_calib(self):
+        if self._is_qrm:
+            logger.info('Calibrate ADC')
+        else:
+            logger.error("QCM does not have method 'start_adc_calib'")
+
     def config_seq(self, seq_nr, name, value):
         self.sequencers[seq_nr].config(name, value)
 

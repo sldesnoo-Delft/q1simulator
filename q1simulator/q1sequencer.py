@@ -243,12 +243,6 @@ class Q1Sequencer(InstrumentChannel):
             index = self.acquisition_bins[name]['index']
             self.rt_renderer.delete_acquisition_data(index)
 
-    def start_adc_calib(self):
-        if self._is_qrm:
-            logger.info('Calibrate ADC')
-        else:
-            logger.error("QCM does not have method 'start_adc_calib'")
-
     def set_acquisition_mock_data(self,
                                   data: Optional[Iterable[MockDataType]],
                                   name='default',
