@@ -15,7 +15,7 @@ from qblox_instruments import (
 
 logger = logging.getLogger(__name__)
 
-class Q1Simulator(qc.Instrument):
+class Q1Module(qc.instrument.InstrumentBase):
     _sim_parameters_qcm = [
         'reference_source',
         'out0_offset',
@@ -67,8 +67,10 @@ class Q1Simulator(qc.Instrument):
         'scope_acq_avg_mode_en_path1',
         ]
 
-    def __init__(self, name, n_sequencers=6, sim_type=None):
-        super().__init__(name)
+    # NOTE: No __init__() !!!
+    # This class is used as a mixin. Although quite heavy mixin.
+
+    def init_module(self, n_sequencers=6, sim_type=None):
         check_qblox_instrument_version()
         self._sim_type = sim_type
         if sim_type is None:
@@ -105,15 +107,8 @@ class Q1Simulator(qc.Instrument):
             self.in0_gain(0)
             self.in1_gain(0)
 
-    def get_idn(self):
-        return dict(vendor='Q1Simulator', model=self._sim_type, serial='', firmware='')
-
     @property
-    def instrument_class(self):
-        return InstrumentClass.PULSAR
-
-    @property
-    def instrument_type(self):
+    def module_type(self) -> InstrumentType:
         return InstrumentType[self._sim_type]
 
     @property
@@ -220,4 +215,22 @@ class Q1Simulator(qc.Instrument):
 
     def print_registers(self, seq_nr, reg_nrs=None):
         self.sequencers[seq_nr].print_registers(reg_nrs)
+
+
+class Q1Simulator(qc.Instrument, Q1Module):
+    def __init__(self, name, n_sequencers=6, sim_type=None):
+        super().__init__(name)
+        super().init_module(n_sequencers, sim_type)
+
+    def get_idn(self):
+        return dict(vendor='Q1Simulator', model=self._sim_type, serial='', firmware='')
+
+    @property
+    def instrument_class(self):
+        return InstrumentClass.PULSAR
+
+    @property
+    def instrument_type(self):
+        return InstrumentType[self._sim_type]
+
 

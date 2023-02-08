@@ -1,9 +1,10 @@
 # Q1Simulator
 Simulator to execute Q1ASM and render the output channels.
-The simulator can be used like a `pulsar_qcm` or `pulsar_qrm` object
-of `qblox_instruments`.
-It can be used with other Python software to test the
-generation of Q1ASM program without using the actual hardware.
+The simulator can be used like a `Pulsar` or `Cluster` object
+of `qblox_instruments`, where the Cluster can contain 
+QCM, QRM, QCM-RF and QRM-RF modules.
+The simulator can be used with other Python software to test the
+generation of Q1ASM programs without using the actual hardware.
 It can also be used stand-alone to check and display Q1ASM
 waveforms-and-program files.
 
@@ -27,13 +28,35 @@ The renderer uses the uploaded waveforms and the nco frequency.
 
 # Example
 
-    sim = Q1Simulator('q1sim', sim_type='QCM')
-    sim.sequencer0.waveforms_and_program('my_sequence.json')
+    from q1simulator import Q1Simulator as Pulsar
+
+    sim = Pulsar('q1sim', sim_type='QCM')
+    sim.sequencer0.sequence('my_sequence.json')
     sim.arm_sequencer(0)
     sim.start_sequencer()
     sim.get_sequencer_state(0)
     sim.plot()
     sim.print_acquisitions()
+
+# Cluster
+
+A simulated Cluster can be created with the modules
+specified in a dictionary with  slot number and module type.
+
+    from q1simulator import Cluster
+    modules = {
+        2: "QCM",
+        4: "QCM",
+        6: "QRM",
+        }
+    cluster = Cluster('name', modules)
+
+    qcm2 = cluster.module2
+    qcm2.sequence('program.json')
+	
+	cluster.arm_sequencer()
+	cluster.start_sequencer()
+
 
 # Q1ASM file viewer
 `plot_q1asm_file` is a simple function that reads a file
@@ -77,12 +100,16 @@ The following QCM/QRM methods and parameters are implemented by
 the simulator and mimic behavior of the device:
 - reset
 - get_system_state
+- get_num_system_error
+- get_system_error
 - get_sequencer_state
 - arm_sequencer
 - start_sequencer
 - stop_sequencer
 - get_acquisition_state
 - get_acquisitions
+- delete_acquisition_data
+- start_adc_calib
 - sequencer0.nco_freq
 - sequencer0.mod_en_awg
 - sequencer0.demod_en_acq
@@ -91,6 +118,8 @@ the simulator and mimic behavior of the device:
 - sequencer0.channel_map_path0_out2_en
 - sequencer0.channel_map_path1_out3_en
 - sequencer0.sequence
+- sequencer0.mixer_corr_gain_ratio
+- sequencer0.mixer_corr_phase_offset_degree
 
 All other parameters only print the passed value.
 

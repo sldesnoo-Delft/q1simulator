@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.8.2] - 2023-02-06
+
+- Added QRM ADC calibration.
+- Changed logging.info() to logger.info()
+- Added Cluster and ClusterModule
+
 ## \[0.8.1] - 2022-12-22
 
 - Changed reset_ph to better match Qblox firmware 0.3.0.
