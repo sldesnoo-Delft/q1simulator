@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
-## \[0.8.2] - 2023-02-06
+## \[0.8.2] - 2023-02-08
 
 - Added QRM ADC calibration.
 - Changed logging.info() to logger.info()
