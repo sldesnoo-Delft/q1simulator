@@ -81,6 +81,7 @@ class Renderer:
         self.waves = (None, None)
         self.out0 = []
         self.out1 = []
+        self.marker_out = [list() for _ in range(4)] # a list per marker
         self.acq_times = {i:[] for i in self.acq_bins}
         self.acq_buffer = AcqBuffer()
         self.mock_data = {}
@@ -217,7 +218,19 @@ class Renderer:
             new.frequency = None
         self.delta_phase += new.phase_shift
         new.phase_shift = 0.0
-        # copy offset and gain
+        if new.marker != old.marker:
+            for i in range(4):
+                m = 1 << i
+                m_old = old.marker & m
+                m_new = new.marker & m
+                if (new.marker & m) != (m_old):
+                    l = self.marker_out[i]
+                    if self.time < self.max_render_time:
+                        l += [[self.time, m_old], [self.time, m_new]]
+                    elif l[-1][0] < self.max_render_time:
+                        # add final marker step
+                        l += [[self.max_render_time, m_old], [self.max_render_time, 0]]
+        # copy marker, offset and gain
         self.settings = copy(self.next_settings)
 
     def _render(self, time):
@@ -334,15 +347,27 @@ class Renderer:
 
     def plot(self, v_max):
         scaling = v_max/2**15
+        t_end = self.time
         if self.time > self.max_render_time:
             max_ms = self.max_render_time / 1e6
+            t_end = self.max_render_time
             print(f'{self.name}: Rendering truncated at {max_ms:3.1f} ms. Total time: {self.time/1e6:4.1f} ms')
         if len(self.path_out_enabled[0]):
             out0 = scaling * np.concatenate(self.out0)
+            # print(f'Average V: {np.mean(out0)*1000:5.2f} mV')
             pt.plot(out0, label=f'{self.name}.{self.path_out_enabled[0]}')
         if len(self.path_out_enabled[1]):
             out1 = scaling * np.concatenate(self.out1)
+            # print(f'Average V: {np.mean(out1)*1000:5.2f} mV')
             pt.plot(out1, label=f'{self.name}.{self.path_out_enabled[1]}')
+        for i,m_list in enumerate(self.marker_out):
+            if len(m_list) == 0:
+                continue
+            l = [[0,0]]
+            l += m_list
+            l.append([t_end,0])
+            line = np.array(l).T
+            pt.plot(line[0], line[1], ':', label=f'{self.name}.M{i}')
 
     def set_mock_data(self, bins, data: Iterable[Sequence[float]]):
         self.mock_data[bins] = iter(data)

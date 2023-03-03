@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.8.3] - 2023-03-03
+
+- Added rendering of markers
+
 ## \[0.8.2] - 2023-02-08
 
 - Added QRM ADC calibration.
