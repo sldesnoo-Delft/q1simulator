@@ -31,6 +31,21 @@ class Q1Core:
         parser = Q1Parser()
         self.lines,self.instructions = parser.parse(program)
 
+    def get_used_triggers(self):
+        '''
+        Returns int with OR of all used condition masks
+        '''
+        res = 0
+        for instr in self.instructions:
+            if instr.mnemonic == 'set_cond':
+                mask = instr.args[1]
+                if 1 in instr.reg_args:
+                    # Trigger addresses are determined at run time.
+                    logger.info('Condition mask is register.')
+                    continue
+                res |= mask
+        return res
+
     def run(self):
         self.errors = set()
         self.R = [0]*64
@@ -205,6 +220,9 @@ class Q1Core:
         self.clock.add_ticks(1)
         self.renderer.set_awg_offs(offset0, offset1)
 
+    def _set_cond(self, enable, mask, op, else_wait):
+        self.renderer.set_cond(enable, mask, op, else_wait)
+
     def _upd_param(self, wait_after):
         self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
@@ -228,6 +246,16 @@ class Q1Core:
         self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire_weighed(bins, bin_index, weight0, weight1, wait_after)
+
+    def _latch_en(self, enable, wait_after):
+        self.clock.add_ticks(1)
+        self.clock.schedule_rt(self.renderer.time)
+        self.renderer.latch_en(enable, wait_after)
+
+    def _latch_rst(self, wait):
+        self.clock.add_ticks(1)
+        self.clock.schedule_rt(self.renderer.time)
+        self.renderer.latch_rst(wait)
 
     def _wait(self, time):
         self.clock.add_ticks(1)
@@ -265,6 +293,8 @@ class Q1Core:
             time_str = f' q1:{self.clock.core_time:6} rt:{self.renderer.time:6} ns'
         print(f'{msg}: {value_str}{time_str}')
 
+    def _sim_trigger(self, addr, value):
+        self.renderer.sim_trigger(addr, value)
 
 class CoreClock:
     def __init__(self):

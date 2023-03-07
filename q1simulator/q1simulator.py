@@ -7,6 +7,8 @@ import qcodes as qc
 
 from .q1sequencer import Q1Sequencer
 from .qblox_version import check_qblox_instrument_version
+from .triggers import TriggerDistributor
+from .trigger_sorting import get_seq_trigger_info, sort_sequencers
 
 from qblox_instruments import (
         SystemStatus, SystemState, SystemStatusSlotFlags,
@@ -91,6 +93,8 @@ class Q1Module(qc.instrument.InstrumentBase):
             sim_params = self._sim_parameters_qrm
         elif sim_type == 'QRM-RF':
             sim_params = self._sim_parameters_qrm_rf
+        elif sim_type == 'Viewer':
+            sim_params = list(set(self._sim_parameters_qcm+self._sim_parameters_qrm))
         else:
             sim_params = []
 
@@ -233,4 +237,23 @@ class Q1Simulator(qc.Instrument, Q1Module):
     def instrument_type(self):
         return InstrumentType[self._sim_type]
 
+    def start_sequencer(self, sequencer: Optional[int] = None):
+        if sequencer is not None:
+            self.sequencers[sequencer].run()
+            return
 
+        # collect sequencers and sort on used triggers
+        # TODO Refactor trigger distribution in runtime distribution.
+        seq_infos = []
+        for seq_number in self.armed_seq:
+            seq_infos.append(
+                    get_seq_trigger_info(self, seq_number, self.sequencers[seq_number])
+                    )
+
+        trigger_dist = TriggerDistributor()
+        seq_infos = sort_sequencers(seq_infos)
+        for seq_info in seq_infos:
+            seq = seq_info.module.sequencers[seq_info.seq_number]
+            seq.set_trigger_events(trigger_dist.get_trigger_events())
+            seq.run()
+            trigger_dist.add_emitted_triggers(seq.get_acq_trigger_events())

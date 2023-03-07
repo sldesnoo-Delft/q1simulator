@@ -1,12 +1,15 @@
 import logging
 from copy import copy
 from dataclasses import dataclass
-from typing import Optional, Sequence, Iterable, Union
+from typing import Optional, Sequence, Iterable, Union, List
 from numbers import Number
 from collections.abc import Sequence as AbcSequence
+from functools import wraps
 
 import numpy as np
 import matplotlib.pyplot as pt
+
+from .triggers import TriggerEvent
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,17 @@ class Settings:
     relative_phase: Optional[float] = None
     phase_shift : float = 0
     frequency : Optional[float] = None
+
+
+@dataclass
+class AcqConf:
+    length: int = 0 # max 16 ms
+    rotation: float = 0.0 # deg.
+    threshold: float = 0.0
+    trigger_en: bool = False
+    trigger_addr: int = 0
+    trigger_invert: bool = False
+
 
 def _phase2float(phase_uint32):
     # phase in rotations, i.e. unit = 2 pi rad
@@ -50,6 +64,17 @@ def float2int16array(value):
 def _i16(value):
     return np.int16(value)
 
+def check_conditional(func):
+    @wraps(func)
+    def func_wrapper(self, *args, **kwargs):
+        if self.skip_rt:
+            self._else_wait()
+        else:
+            func(self, *args, **kwargs)
+
+    return func_wrapper
+
+
 class Renderer:
 
     def __init__(self, name):
@@ -67,6 +92,9 @@ class Renderer:
         self.delete_acquisition_data_all()
         self.reset()
         self.trace_enabled = False
+        self.threshold_values = np.zeros(15, dtype=np.uint16)
+        self.threshold_invert = np.zeros(15, dtype=bool)
+        self.acq_conf = AcqConf()
 
     def reset(self):
         self.settings = Settings()
@@ -84,8 +112,14 @@ class Renderer:
         self.marker_out = [list() for _ in range(4)] # a list per marker
         self.acq_times = {i:[] for i in self.acq_bins}
         self.acq_buffer = AcqBuffer()
+        self.acq_trigger_events = []
         self.mock_data = {}
         self.errors = set()
+        self.latch_enabled = False
+        self.latch_regs = np.zeros(15, dtype=np.uint16)
+        self.trigger_events: List[TriggerEvent] = []
+        self.skip_rt = False
+        self.else_wait = 0
 
     def path_enable(self, path, out, enable):
         if enable:
@@ -106,6 +140,36 @@ class Renderer:
     def set_acquisition_bins(self, acq_bins):
         self.acq_bins = acq_bins
         self.delete_acquisition_data_all()
+
+    def set_trigger_count_threshold(self, addr, count):
+        self.threshold_count[addr-1] = count
+
+    def set_trigger_threshold_invert(self, addr, invert):
+        self.threshold_invert[addr-1] = invert
+
+    def get_trigger_count_threshold(self, addr):
+        return self.threshold_count[addr-1]
+
+    def get_trigger_threshold_invert(self, addr):
+        return self.threshold_invert[addr-1]
+
+    def set_integratrion_length_acq(self, value):
+        self.acq_conf.length = value
+
+    def set_thresholded_acq_rotation(self, value):
+        self.acq_conf.rotation = value
+
+    def set_thresholded_acq_threshold(self, value):
+        self.acq_conf.threshold = value
+
+    def set_thresholded_acq_trigger_en(self, value):
+        self.acq_conf.trigger_en = value
+
+    def set_thresholded_acq_trigger_addr(self, value):
+        self.acq_conf.trigger_addr = value
+
+    def set_thresholded_acq_trigger_invert(self, value):
+        self.acq_conf.trigger_invert = value
 
     def set_mrk(self, value):
         self.next_settings.marker = value
@@ -130,10 +194,12 @@ class Renderer:
         self.next_settings.awg_offs0 = offset0
         self.next_settings.awg_offs1 = offset1
 
+    @check_conditional
     def upd_param(self, wait_after):
         self._update_settings()
         self._render(wait_after)
 
+    @check_conditional
     def play(self, wave0, wave1, wait_after):
         self._update_settings()
         if self.trace_enabled:
@@ -149,13 +215,15 @@ class Renderer:
                               self.time + len(self.waves[1]))
         self._render(wait_after)
 
+    @check_conditional
     def acquire(self, bins, bin_index, wait_after):
         self._update_settings()
         if self.trace_enabled:
             self._trace(f'Acquire {bins} {bin_index}')
-        self._add_acquisition(bins, bin_index)
+        self._add_acquisition(bins, bin_index, self.acq_conf.length)
         self._render(wait_after)
 
+    @check_conditional
     def acquire_weighed(self, bins, bin_index, weight0, weight1, wait_after):
         self._update_settings()
         if self.trace_enabled:
@@ -165,9 +233,14 @@ class Renderer:
         elif weight1 not in self.acq_weights:
             self._error('ACQ WEIGHT PLAYBACK INDEX INVALID PATH 1')
         else:
-            self._add_acquisition(bins, bin_index)
+            duration = max(
+                    len(self.acq_weights[weight0]),
+                    len(self.acq_weights[weight1])
+                    )
+            self._add_acquisition(bins, bin_index, duration)
         self._render(wait_after)
 
+    @check_conditional
     def wait(self, time):
         if self.trace_enabled:
             self._trace(f'Wait {time}')
@@ -175,6 +248,55 @@ class Renderer:
 
     def wait_sync(self, wait_after):
         self._render(wait_after)
+
+    def set_cond(self, enable, mask, op, else_wait):
+        if not enable:
+            self.skip_rt = False
+            return
+        self._process_triggers()
+        # numpy arrays
+        mask_ar = np.unpackbits([np.uint8(mask>>8), np.uint8(mask&0xFF)])
+        state = ((self.latch_regs >= self.threshold_count) ^ self.threshold_invert) & mask_ar
+        bits_set = np.sum(state)
+        bits_mask = np.sum(mask)
+        if op == 0: # OR
+            match = bits_set != 0
+        elif op == 1: # NOR
+            match = bits_set == 0
+        elif op == 2: # AND
+            match = bits_set == bits_mask
+        elif op == 3: # NAND
+            match = bits_set != bits_mask
+        elif op == 4: # XOR
+            match = (bits_set%2) == 1
+        elif op == 5: # XNOR
+            match = (bits_set%2) == 0
+        else:
+            raise Exception(f'Unknown operator {op}')
+        self.skip_rt = not match
+        self.else_wait = else_wait
+
+    def _else_wait(self, *args, **kwargs):
+        self._render(self.else_wait)
+
+    def latch_en(self, enable, wait_after):
+        if self.trace_enabled:
+            self._trace(f'Latch {"on" if enable else "off"}')
+        self._process_triggers()
+        self.latch_enabled = enable
+        self._render(wait_after)
+
+    def latch_rst(self, wait):
+        if self.trace_enabled:
+            self._trace(f'Latch reset {wait}')
+        self._process_triggers()
+        self.latch_regs[:] = 0
+        self._render(wait)
+
+    def sim_trigger(self, addr, value):
+        # addresses 1..15. Register index (bits) 0..14!
+        index = addr-1
+        self.latch_regs[index] += value
 
     def _error(self, msg):
         logger.error(f'{self.name}: {msg}')
@@ -294,6 +416,15 @@ class Renderer:
         if len(self.path_out_enabled[1]):
             self.out1.append(data1)
 
+    def _process_triggers(self):
+        t = self.time
+        # TODO Refactor trigger distribution. Request triggers for interval.
+        while len(self.trigger_events) > 0 and self.trigger_events[0].time <= t:
+            trigger = self.trigger_events.pop(0)
+            if self.latch_enabled:
+                index = trigger.addr-1
+                self.latch_regs[index] += trigger.state
+
     def _get_acq_data(self, bins, default):
         mock_data_iter = self.mock_data.get(bins, None)
         if mock_data_iter is None:
@@ -315,6 +446,7 @@ class Renderer:
     def delete_acquisition_data_all(self):
         self.acq_count = {}
         self.acq_data = {}
+        self.acq_thresholded = {}
         for index in self.acq_bins:
             self.delete_acquisition_data(index)
 
@@ -322,8 +454,9 @@ class Renderer:
         num_bins = self.acq_bins[index]
         self.acq_count[index] = np.zeros(num_bins, dtype=int)
         self.acq_data[index] = np.full((num_bins, 2), np.nan)
+        self.acq_thresholded[index] = np.full(num_bins, np.nan)
 
-    def _add_acquisition(self, bins, bin_index):
+    def _add_acquisition(self, bins, bin_index, duration):
         t = self.time
         if bins not in self.acq_bins:
             self._error('ACQ INDEX INVALID')
@@ -331,15 +464,29 @@ class Renderer:
         self.acq_times[bins].append((t, bin_index))
         if bin_index >= self.acq_bins[bins]:
             self._error('ACQ BIN INDEX INVALID')
-        elif not self.acq_buffer.add(t):
+            return
+        if not self.acq_buffer.add(t):
             self._error('ACQ BINNING FIFO ERROR')
+            return
+        acq_conf = self.acq_conf
+        value = self._get_acq_data(bins, t)
+        angle = acq_conf.rotation/180*np.pi
+        rot_value = value[0]*np.cos(angle) + value[1]*np.sin(angle)
+        state = rot_value >= acq_conf.threshold
+
+        if self.acq_count[bins][bin_index] == 0:
+            self.acq_data[bins][bin_index] = value
+            self.acq_thresholded[bins][bin_index] = state
         else:
-            value = self._get_acq_data(bins, t)
-            if self.acq_count[bins][bin_index] == 0:
-                self.acq_data[bins][bin_index] = value
-            else:
-                self.acq_data[bins][bin_index] += value
-            self.acq_count[bins][bin_index] += 1
+            self.acq_data[bins][bin_index] += value
+            self.acq_thresholded[bins][bin_index] += state
+        self.acq_count[bins][bin_index] += 1
+
+        if acq_conf.trigger_en:
+            t_end = t + duration
+            trigger_state = state ^ acq_conf.trigger_invert
+            # TODO also add to trigger events. Part of TriggerDistributor redesign.
+            self.acq_trigger_events.append(TriggerEvent(acq_conf.addr, t_end, trigger_state))
 
     def _trace(self, msg):
         if self.trace_enabled:
@@ -373,7 +520,7 @@ class Renderer:
         self.mock_data[bins] = iter(data)
 
     def get_acquisition_data(self):
-        return (self.acq_count, self.acq_data)
+        return (self.acq_count, self.acq_data, self.acq_thresholded)
 
     def get_acquisition_list(self):
         return self.acq_times
@@ -388,7 +535,7 @@ class AcqBuffer:
         while len(b) and self.write_ready <= time:
             acq = b.pop(0)
             write_start = max(acq, self.write_ready)
-            self.write_ready = write_start + 1040
+            self.write_ready = write_start + 300
         overflow = len(b) > 7
         if not overflow:
             b.append(time)

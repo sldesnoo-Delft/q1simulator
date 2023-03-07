@@ -3,7 +3,7 @@ from functools import partial
 from dataclasses import dataclass
 import json
 import numpy as np
-from typing import Optional, Iterator, Iterable
+from typing import Optional, Iterator, Iterable, Tuple
 
 from qcodes.instrument.channel import InstrumentChannel
 
@@ -38,7 +38,8 @@ class Q1Sequencer(InstrumentChannel):
         'offset_awg_path1',
         ]
     _seq_log_only_parameters_qrm = [
-        'integration_length_acq',
+        # old v0.8 parameters for backwards compatibility
+        # TODO remove in next release.
         'phase_rotation_acq',
         'discretization_threshold_acq',
         ]
@@ -73,6 +74,13 @@ class Q1Sequencer(InstrumentChannel):
                            set_cmd=partial(self._set_channel_map_path_en, 0, 0))
         self.add_parameter('channel_map_path1_out1_en',
                            set_cmd=partial(self._set_channel_map_path_en, 1, 1))
+
+        for i in range(1,16):
+            self.add_parameter(f'trigger{i}_count_threshold',
+                               set_cmd=partial(self._set_trigger_count_threshold, i))
+            self.add_parameter(f'trigger{i}_threshold_invert',
+                               set_cmd=partial(self._set_trigger_threshold_invert, i))
+
         if self._is_qcm:
             self.add_parameter('channel_map_path0_out2_en',
                                set_cmd=partial(self._set_channel_map_path_en, 0, 2))
@@ -80,6 +88,12 @@ class Q1Sequencer(InstrumentChannel):
                                set_cmd=partial(self._set_channel_map_path_en, 1, 3))
         if self._is_qrm:
             self.add_parameter('demod_en_acq', set_cmd=self._set_demod_en_acq)
+            self.add_parameter('integration_length_acq', set_cmd=self._set_integratrion_length_acq)
+            self.add_parameter('thresholded_acq_rotation', set_cmd=self._set_thresholded_acq_rotation)
+            self.add_parameter('thresholded_acq_threshold', set_cmd=self._set_thresholded_acq_threshold)
+            self.add_parameter('thresholded_acq_trigger_en', set_cmd=self._set_thresholded_acq_trigger_en)
+            self.add_parameter('thresholded_acq_trigger_address', set_cmd=self._set_thresholded_acq_trigger_address)
+            self.add_parameter('thresholded_acq_trigger_invert', set_cmd=self._set_thresholded_acq_trigger_invert)
 
         self._trace = False
         self.reset()
@@ -101,6 +115,7 @@ class Q1Sequencer(InstrumentChannel):
         self.weights = {}
         self.acquisition_bins = {}
         self._mock_data = {}
+        self._trigger_events = []
         self.run_state = 'IDLE'
         self.rt_renderer = Renderer(self.name)
         self.rt_renderer.trace_enabled = self._trace
@@ -132,6 +147,30 @@ class Q1Sequencer(InstrumentChannel):
     def _set_channel_map_path_en(self, path, out, value):
         logger.debug(f'{self.name}: channel_map_path{path}_out{out}_en={value}')
         self.rt_renderer.path_enable(path, out, value)
+
+    def _set_trigger_count_threshold(self, address, count):
+        self.rt_renderer.set_trigger_count_threshold(address, count)
+
+    def _set_trigger_threshold_invert(self, address, invert: bool):
+        self.rt_renderer.set_trigger_threshold_invert(address, invert)
+
+    def _set_integratrion_length_acq(self, value):
+        self.rt_renderer.set_integratrion_length_acq(value)
+
+    def _set_thresholded_acq_rotation(self, value):
+        self.rt_renderer.set_thresholded_acq_rotation(value)
+
+    def _set_thresholded_acq_threshold(self, value):
+        self.rt_renderer.set_thresholded_acq_threshold(value)
+
+    def _set_thresholded_acq_trigger_en(self, value):
+        self.rt_renderer.set_thresholded_acq_trigger_en(value)
+
+    def _set_thresholded_acq_trigger_address(self, value):
+        self.rt_renderer.set_thresholded_acq_trigger_addr(value)
+
+    def _set_thresholded_acq_trigger_invert(self, value):
+        self.rt_renderer.set_thresholded_acq_trigger_invert(value)
 
     def upload(self, sequence):
         if isinstance(sequence, str):
@@ -200,6 +239,16 @@ class Q1Sequencer(InstrumentChannel):
             raise NotImplementedError('Instrument type is not QRM')
         return True
 
+    def set_trigger_thresholding(self, address: int, count: int, invert: bool) -> None:
+        self.rt_renderer.set_trigger_count_threshold(address, count)
+        self.rt_renderer.set_trigger_threshold_invert(address, invert)
+
+    def get_trigger_thresholding(self, address: int) -> Tuple[int,bool]:
+        return (
+            self.rt_renderer.get_trigger_count_threshold(address),
+            self.rt_renderer.get_trigger_threshold_invert(address)
+            )
+
     def arm(self):
         self.run_state = 'ARMED'
 
@@ -207,20 +256,20 @@ class Q1Sequencer(InstrumentChannel):
         self.run_state = 'RUNNING'
         self.rt_renderer.reset()
         self._set_rt_mock_data()
+        self.rt_renderer.trigger_events = self._trigger_events
         self.q1core.run()
         self.run_state = 'STOPPED'
 
     def get_acquisition_data(self):
         if not self._is_qrm:
             raise NotImplementedError('Instrument type is not QRM')
-        cnt,data = self.rt_renderer.get_acquisition_data()
+        cnt,data,thresholded = self.rt_renderer.get_acquisition_data()
         result = {}
         for name, datadict in self.acquisition_bins.items():
             index = int(datadict['index'])
-            num_bins = int(datadict['num_bins'])
             acq_count = cnt[index]
-            path_data = data[index]
-            # TODO @@@ implement threshold
+            path_data = data[index]/acq_count[:,None]
+            threshold = thresholded[index]/acq_count
 
             result[name] = {
                 'index':index,
@@ -230,7 +279,7 @@ class Q1Sequencer(InstrumentChannel):
                             'path0':list(path_data[:,0]),
                             'path1':list(path_data[:,1]),
                             },
-                        'threshold':[0.0]*num_bins,
+                        'threshold':threshold,
                         'avg_cnt':list(acq_count),
                     }
                 }}
@@ -242,6 +291,8 @@ class Q1Sequencer(InstrumentChannel):
         else:
             index = self.acquisition_bins[name]['index']
             self.rt_renderer.delete_acquisition_data(index)
+
+    # --- Simulator specific methods ---
 
     def set_acquisition_mock_data(self,
                                   data: Optional[Iterable[MockDataType]],
@@ -299,6 +350,15 @@ class Q1Sequencer(InstrumentChannel):
             del self._mock_data[name]
         else:
             self._mock_data[name] = MockData(data, repeat)
+
+    def get_used_triggers(self):
+        return self.q1core.get_used_triggers()
+
+    def get_acq_trigger_events(self):
+        return self.rt_renderer.acq_trigger_events
+
+    def set_trigger_events(self, events):
+        self._trigger_events = events
 
     def plot(self):
         self.rt_renderer.plot(self._v_max)

@@ -15,7 +15,9 @@ class PlotDef:
     lo_frequency: float = None
 
 
-def plot_q1asm_file(filename, out=[0,1], lo_frequency=None,
+def plot_q1asm_file(filename,
+                    out=[0,1],
+                    lo_frequency=None,
                     max_render_time=2e6,
                     max_core_cycles=1e7):
     plot = PlotDef(filename, out=out, lo_frequency=lo_frequency)
@@ -33,8 +35,9 @@ def plot_q1asm_files(plot_defs,
     sim.config('max_core_cycles', max_core_cycles)
 
     for i,plot in enumerate(plot_defs):
-        if plot.sequencer_name:
-            sim.config_seq(i, 'name', plot.sequencer_name)
+# FIXME
+#        if plot.sequencer_name:
+#            sim.config_seq(i, 'name', plot.sequencer_name)
 
         sequencer = getattr(sim, f'sequencer{i}')
         if plot.lo_frequency is None:

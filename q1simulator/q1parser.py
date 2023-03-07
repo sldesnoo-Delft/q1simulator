@@ -42,10 +42,13 @@ mnemonic_args = {
     'set_ph_delta': 'IR',
     'set_awg_gain': 'IR,IR',
     'set_awg_offs': 'IR,IR',
+    'set_cond': 'IR,IR,IR,I',
     'upd_param': 'I',
     'play': 'IR,IR,I',
     'acquire': 'I,IR,I',
     'acquire_weighed': 'I,IR,IR,IR,I',
+    'latch_en': 'IR,I',
+    'latch_rst': 'IR',
     'wait': 'IR',
     'wait_sync': 'IR',
     'wait_trigger': 'IR',
@@ -91,7 +94,6 @@ class Q1Parser:
                     raise
 
         return lines,instructions
-
 
     def _parseline(self, line):
         org_line = line
@@ -139,6 +141,12 @@ class Q1Parser:
             if msg is None:
                 msg = ''
             return None,'log',(msg,register,options)
+        trigger_pattern = r'sim_trigger (\d),\s*([01])'
+        match = re.fullmatch(trigger_pattern, command)
+        if match:
+            addr = match.group(1)
+            value = match.group(2)
+            return None,'sim_trigger',(addr, value)
         print(f'Unknown simulator command:{command}')
         return None,None,None
 

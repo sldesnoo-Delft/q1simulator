@@ -8,6 +8,8 @@ from qblox_instruments import (
         )
 
 from .q1simulator import Q1Module
+from .triggers import TriggerDistributor
+from .trigger_sorting import get_seq_trigger_info, sort_sequencers
 
 logger = logging.getLogger(__name__)
 
@@ -85,11 +87,30 @@ class Cluster(qc.Instrument):
     def start_sequencer(self, slot: Optional[int] = None, sequencer: Optional[int] = None) -> None:
         if slot is not None:
             self._check_module_present(slot)
-            self._modules[slot].start_sequencer(sequencer)
+            modules = [self._modules[slot]]
         else:
-            for module in self._modules.values():
-                if module.present():
-                    module.start_sequencer(sequencer)
+            modules = [
+                    module for module in self._modules.values()
+                    if module.present()
+                    ]
+
+        # collect sequencers and sort on used triggers
+        # TODO Refactor trigger distribution. Change into runtime distributor.
+        seq_infos = []
+        for module in modules:
+            seq_numbers = [sequencer] if sequencer is not None else module.armed_seq
+            for seq_number in seq_numbers:
+                seq_infos.append(
+                        get_seq_trigger_info(module, seq_number, module.sequencers[seq_number])
+                        )
+
+        trigger_dist = TriggerDistributor()
+        seq_infos = sort_sequencers(seq_infos)
+        for seq_info in seq_infos:
+            seq = seq_info.module.sequencers[seq_info.seq_number]
+            seq.set_trigger_events(trigger_dist.get_trigger_events())
+            seq.run()
+            trigger_dist.add_emitted_triggers(seq.get_acq_trigger_events())
 
     def stop_sequencer(self, slot: Optional[int] = None, sequencer: Optional[int] = None) -> None:
         if slot is not None:
