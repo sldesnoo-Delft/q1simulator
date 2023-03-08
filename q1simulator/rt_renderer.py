@@ -92,7 +92,7 @@ class Renderer:
         self.delete_acquisition_data_all()
         self.reset()
         self.trace_enabled = False
-        self.threshold_values = np.zeros(15, dtype=np.uint16)
+        self.threshold_count = np.full(15, 2^16-1, dtype=np.uint16)
         self.threshold_invert = np.zeros(15, dtype=bool)
         self.acq_conf = AcqConf()
 
@@ -251,14 +251,15 @@ class Renderer:
 
     def set_cond(self, enable, mask, op, else_wait):
         if not enable:
+            self._trace(f'Cond disabled')
             self.skip_rt = False
             return
         self._process_triggers()
         # numpy arrays
-        mask_ar = np.unpackbits([np.uint8(mask>>8), np.uint8(mask&0xFF)])
+        mask_ar = np.unpackbits([np.uint8(mask>>8), np.uint8(mask&0xFF)])[:0:-1]
         state = ((self.latch_regs >= self.threshold_count) ^ self.threshold_invert) & mask_ar
         bits_set = np.sum(state)
-        bits_mask = np.sum(mask)
+        bits_mask = np.sum(mask_ar)
         if op == 0: # OR
             match = bits_set != 0
         elif op == 1: # NOR
@@ -273,6 +274,12 @@ class Renderer:
             match = (bits_set%2) == 0
         else:
             raise Exception(f'Unknown operator {op}')
+        logger.info(f'set_cond 1, {mask}, {op}, {else_wait}')
+        logger.info(f'latches: {self.latch_regs}')
+        logger.info(f'mask:    {mask_ar}')
+        logger.info(f'state:   {state}')
+        logger.info(f'cond:    {match}')
+        self._trace(f'Cond {match}')
         self.skip_rt = not match
         self.else_wait = else_wait
 
@@ -295,8 +302,8 @@ class Renderer:
 
     def sim_trigger(self, addr, value):
         # addresses 1..15. Register index (bits) 0..14!
-        index = addr-1
-        self.latch_regs[index] += value
+        index = int(addr)-1
+        self.latch_regs[index] += int(value)
 
     def _error(self, msg):
         logger.error(f'{self.name}: {msg}')

@@ -54,6 +54,6 @@ def sort_sequencers(sequencers: List[SequencerTriggerInfo]):
                 seq_in.remove(seq)
                 added += 1
         if added == 0:
-            raise Exception(f"sorting failed... {seq_out}")
+            raise Exception(f"sorting failed... {seq_in}")
 
     return seq_out

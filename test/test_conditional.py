@@ -4,25 +4,45 @@ Created on Sat Oct 22 19:04:38 2022
 
 @author: sdesnoo
 """
-from q1simulator import Q1Simulator
+from q1simulator import Cluster
+import qcodes as qc
 
 def init():
-    q1simulator = Q1Simulator('test', sim_type='QCM')
-    q1simulator.config('trace', True)
-    return q1simulator
+    qc.Instrument.close_all()
+    cluster = Cluster('test', {2:'QRM'})
+    qrm = cluster.module2
+    qrm.config('trace', True)
+    return cluster
 
-def run(q1simulator, program, waveforms={}, weights={}, acquisitions={}):
+def run(cluster, program, waveforms={}, weights={}, acquisitions={}):
 
-    seq = q1simulator.sequencers[0]
+    qrm = cluster.module2
+    seq = qrm.sequencers[0]
     seq.channel_map_path0_out0_en = True
+    seq.thresholded_acq_trigger_en(True)
+    seq.thresholded_acq_trigger_address(1)
+    seq.trigger1_count_threshold(1)
     seq.upload({
             'program': program,
             'waveforms': waveforms,
             'weights': weights,
             'acquisitions': acquisitions})
-    q1simulator.arm_sequencer(0)
-    q1simulator.start_sequencer()
-    q1simulator.plot()
+    qrm.arm_sequencer(0)
+
+    for seq_number,trigger_number in [(1, 2), (2,3)]:
+        seq = qrm.sequencers[seq_number]
+        seq.thresholded_acq_trigger_en(True)
+        seq.thresholded_acq_trigger_address(trigger_number)
+        seq.upload({
+                'program': 'stop',
+                'waveforms': {},
+                'weights': {},
+                'acquisitions': {}
+                })
+        qrm.arm_sequencer(seq_number)
+
+    cluster.start_sequencer()
+    qrm.plot()
 
 waveforms = {
     "gauss80": {
@@ -61,15 +81,17 @@ sim = init()
 sim.reset()
 program='''
 wait_sync 100
-#Q1Sim:set_latch 0, 1
+latch_en 1,4
+#Q1Sim:sim_trigger 1, 1
+
 play 0,0,92 # subtract 8 for next conditional
 
-set_cond 1, 1, 1, 4
+set_cond 1, 1, 0, 4
 wait 8 # 4ns * number of statements including this wait
 play 0,1,72 # subtract 8 ns for next conditional
 # duration of else: 8 ns
 
-set_cond 1, 2, 1, 4
+set_cond 1, 2, 0, 4
 play 1,0,60
 wait 20
 
@@ -84,21 +106,22 @@ print('====')
 
 program='''
 wait_sync 100
-#Q1Sim:set_latch 0, 1
+latch_en 1,4
+#Q1Sim:sim_trigger 1, 1
 play 0,0,84 # subtract 16ns: total of else_wait of if/elif conditionals (final else not included)
 
-set_cond 1, 1, 1, 4
+set_cond 1, 1, 0, 4
 wait 16 # total else_wait of if/elif conditionals
 play 0,1,68 # subtract 12 ns: total of else of next conditionals
 # duration of else: 8 ns
 
-set_cond 1, 2, 1, 4
+set_cond 1, 2, 0, 4
 wait 8 # wait 8 ns: # total else_wait of if/elif conditionals - total else_wait previous conditionals
 play 1,0,76 # subtract 4 ns for else of next conditional
 # duration of else: 8 ns
 
 set_awg_gain 32000,16000
-set_cond 1, 4, 1, 4
+set_cond 1, 4, 0, 4
 play 1,1,80 # starts with 16 ns delay
 # duration of else: 4 ns
 

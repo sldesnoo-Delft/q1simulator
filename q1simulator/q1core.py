@@ -39,7 +39,7 @@ class Q1Core:
         for instr in self.instructions:
             if instr.mnemonic == 'set_cond':
                 mask = instr.args[1]
-                if 1 in instr.reg_args:
+                if instr.reg_args and 1 in instr.reg_args:
                     # Trigger addresses are determined at run time.
                     logger.info('Condition mask is register.')
                     continue
