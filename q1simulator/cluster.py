@@ -1,5 +1,7 @@
-from typing import Optional
 import logging
+from typing import Optional
+from functools import partial
+
 import qcodes as qc
 
 from qblox_instruments import (
@@ -39,7 +41,7 @@ class Cluster(qc.Instrument):
     _cluster_parameters = [
         'trigger_monitor_latest',
         ]
-        
+
     def __init__(self, name, modules={}):
         super().__init__(name)
 
@@ -86,6 +88,9 @@ class Cluster(qc.Instrument):
     def _check_module_present(self, slot):
         if not self._modules[slot].present():
             raise Exception(f'No module in slot {slot}')
+
+    def _set(self, name, value):
+        logger.info(f'{self.name}:{name}={value}')
 
     def arm_sequencer(self, slot: Optional[int] = None, sequencer: Optional[int] = None) -> None:
         if slot is not None:
