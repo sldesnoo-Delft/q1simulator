@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.9.0] - 2023-03-13
+
+- Added conditional execution and triggers
+- API and Q1ASM in line with qblox-instruments v0.9.0
+
 ## \[0.8.3] - 2023-03-03
 
 - Added rendering of markers

@@ -169,6 +169,16 @@ Example:
     # reset default behaviour.
     sim.sequencers[0].set_acquisition_mock_data(None)
 
+# Conditional execution
+The simulator generates triggers according to the acquisition thresholds. 
+At startup the simulator determines the dependencies between trigger producers 
+and trigger consumers. It executes the trigger producing sequencers
+before the trigger consuming sequencers.
+
+The simulator takes the trigger network latency into account, but does not
+check whether triggers overlap. 
+
+
 # Simulator output
 The simulator has some methods to show the simulator output.
 - `plot()` shows pyplot charts with the rendered output.
