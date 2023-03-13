@@ -18,15 +18,18 @@ from qblox_instruments import (
 logger = logging.getLogger(__name__)
 
 class Q1Module(qc.instrument.InstrumentBase):
+    _module_parameters = [
+        'ext_trigger_input_delay',
+        'ext_trigger_input_trigger_en',
+        'ext_trigger_input_trigger_address',
+        ]
     _sim_parameters_qcm = [
-        'reference_source',
         'out0_offset',
         'out1_offset',
         'out2_offset',
         'out3_offset',
         ]
     _sim_parameters_qcm_rf = [
-        'reference_source',
         'out0_lo_freq',
         'out1_lo_freq',
         'out0_lo_en',
@@ -39,7 +42,6 @@ class Q1Module(qc.instrument.InstrumentBase):
         'out1_offset_path1',
         ]
     _sim_parameters_qrm = [
-        'reference_source',
         'out0_offset',
         'out1_offset',
         'in0_gain',
@@ -53,7 +55,6 @@ class Q1Module(qc.instrument.InstrumentBase):
         'scope_acq_avg_mode_en_path1',
         ]
     _sim_parameters_qrm_rf = [
-        'reference_source',
         'in0_att',
         'out0_att',
         'out0_in0_lo_freq',
@@ -222,9 +223,16 @@ class Q1Module(qc.instrument.InstrumentBase):
 
 
 class Q1Simulator(qc.Instrument, Q1Module):
+    _pulsar_parameters = [
+        'reference_source',
+        ]
+        
     def __init__(self, name, n_sequencers=6, sim_type=None):
         super().__init__(name)
         super().init_module(n_sequencers, sim_type)
+
+        for par_name in self._pulsar_parameters:
+            self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
 
     def get_idn(self):
         return dict(vendor='Q1Simulator', model=self._sim_type, serial='', firmware='')

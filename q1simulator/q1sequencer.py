@@ -120,6 +120,7 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer = Renderer(self.name)
         self.rt_renderer.trace_enabled = self._trace
         self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm)
+        self.reset_trigger_thresholding()
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
@@ -248,6 +249,10 @@ class Q1Sequencer(InstrumentChannel):
             self.rt_renderer.get_trigger_count_threshold(address),
             self.rt_renderer.get_trigger_threshold_invert(address)
             )
+
+    def reset_trigger_thresholding(self) -> None:
+        for i in range(1, 16):
+            self.set_trigger_thresholding(i, 1, False)
 
     def arm(self):
         self.run_state = 'ARMED'

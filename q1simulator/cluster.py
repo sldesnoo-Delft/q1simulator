@@ -36,8 +36,20 @@ class EmptySlot(qc.InstrumentChannel):
 
 
 class Cluster(qc.Instrument):
+    _cluster_parameters = [
+        'trigger_monitor_latest',
+        ]
+        
     def __init__(self, name, modules={}):
         super().__init__(name)
+
+        # TODO return trigger count
+        for par_name in self._cluster_parameters:
+            self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
+        for i in range(1,16):
+            par_name = f'trigger{i}_monitor_count'
+            self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
+
         self._modules = {}
         for slot in range(1,21):
             name = f'module{slot}'
