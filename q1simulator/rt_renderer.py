@@ -348,19 +348,22 @@ class Renderer:
         self.delta_phase += new.phase_shift
         new.phase_shift = 0.0
         if new.marker != old.marker:
-            for i in range(4):
-                m = 1 << i
-                m_old = old.marker & m
-                m_new = new.marker & m
-                if (new.marker & m) != (m_old):
-                    l = self.marker_out[i]
-                    if self.time < self.max_render_time:
-                        l += [[self.time, m_old], [self.time, m_new]]
-                    elif l[-1][0] < self.max_render_time:
-                        # add final marker step
-                        l += [[self.max_render_time, m_old], [self.max_render_time, 0]]
+            self._render_marker(old.marker, new.marker)
         # copy marker, offset and gain
         self.settings = copy(self.next_settings)
+
+    def _render_marker(self, old_marker, new_marker):
+        for i in range(4):
+            m = 1 << i
+            m_old = old_marker & m
+            m_new = new_marker & m
+            if m_new != m_old:
+                l = self.marker_out[i]
+                if self.time < self.max_render_time:
+                    l += [[self.time, m_old], [self.time, m_new]]
+                elif l[-1][0] < self.max_render_time:
+                    # add final marker step
+                    l += [[self.max_render_time, m_old], [self.max_render_time, 0]]
 
     def _render(self, time):
         if time & 0x0003:
