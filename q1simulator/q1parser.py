@@ -1,14 +1,15 @@
 import re
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, Any, List
+from typing import Optional, Tuple, Any, List, Union
 
 @dataclass
 class Instruction:
     text_line_nr: int
     mnemonic: str
-    args: Optional[Tuple[str]] = None
+    arglist: Optional[Tuple[str]] = None
     label: Optional[str] = None
+    args: List[Union[int,str]] = None
     reg_args: List[int] = None
     func_name: Optional[str] = None
     func: Any = None
@@ -85,13 +86,15 @@ class Q1Parser:
             instr.func_name = func_name
             if mnemonic in mnemonic_args:
                 try:
-                    args,reg_args = self._evaluate_args(mnemonic_args[mnemonic], instr.args)
+                    args,reg_args = self._evaluate_args(mnemonic_args[mnemonic], instr.arglist)
                     instr.args = args
                     instr.reg_args = reg_args
                 except AsmSyntaxError as ex:
                     print(ex)
                     print(lines[instr.text_line_nr])
                     raise
+            else:
+                instr.args = instr.arglist
 
         return lines,instructions
 
