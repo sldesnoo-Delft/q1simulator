@@ -191,7 +191,9 @@ class Q1Module(qc.instrument.InstrumentBase):
 
     def plot(self, **kwargs):
         for seq in self.sequencers:
-            seq.plot()
+            # assume only sequencers in sync mode have executed.
+            if seq.sync_en():
+                seq.plot()
 
     def print_acquisitions(self):
         for i,seq in enumerate(self.sequencers):
@@ -226,7 +228,7 @@ class Q1Simulator(qc.Instrument, Q1Module):
     _pulsar_parameters = [
         'reference_source',
         ]
-        
+
     def __init__(self, name, n_sequencers=6, sim_type=None):
         super().__init__(name)
         super().init_module(n_sequencers, sim_type)
