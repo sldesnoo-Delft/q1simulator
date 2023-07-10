@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.9.1] - 2023-07-10
+
+- Added config option render_repetitions to render of repeated sequence only once.
+- Only plot output of sequencer with sync_en==True.
+
 ## \[0.9.0] - 2023-03-13
 
 - Added conditional execution and triggers

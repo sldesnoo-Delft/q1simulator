@@ -182,6 +182,7 @@ check whether triggers overlap.
 # Simulator output
 The simulator has some methods to show the simulator output.
 - `plot()` shows pyplot charts with the rendered output.
+- `config(render_repetitions=False)` stops rendering when main sequence is executed once.
 - `print_acquisitions()` prints the path0 and path1 data and average counts.
 - `print_registers()` prints the contents of the Q1 registers.
 
