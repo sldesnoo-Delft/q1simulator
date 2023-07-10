@@ -21,6 +21,7 @@ class Q1Core:
         self.renderer = renderer
         self._is_qrm = is_qrm
         self.max_core_cycles= 10_000_000
+        self.render_repetitions = True
         self.R = [0]*64
         self.lines = []
         self.instructions = []
@@ -153,6 +154,10 @@ class Q1Core:
     def _loop(self, register, label):
         self.clock.add_ticks(5)
         self._set_register(register, self.R[register] - 1)
+        instr = self.instructions[self.iptr-1]
+        if not self.render_repetitions and instr.arglist[1] == '@_start':
+            logger.info('Skipping repetitions')
+            return
         if self.R[register] != 0:
             self.iptr = label
 

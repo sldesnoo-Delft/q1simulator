@@ -109,6 +109,8 @@ class Q1Sequencer(InstrumentChannel):
         elif name == 'trace':
             self._trace = value
             self.rt_renderer.trace_enabled = value
+        elif name == 'render_repetitions':
+            self.q1core.render_repetitions = value
 
     def reset(self):
         self.waveforms = {}
