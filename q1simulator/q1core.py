@@ -61,7 +61,13 @@ class Q1Core:
             return
 
         for instr in self.instructions:
-            instr.func = getattr(self, instr.func_name)
+            try:
+                instr.func = getattr(self, instr.func_name)
+            except AttributeError as ex:
+                msg = f'Illegal instruction at line {instr.text_line_nr}: {ex}'
+                self._print_error_msg(msg, instr, 0)
+                self._error('SEQUENCE PROCESSOR Q1 ILLEGAL INSTRUCTION')
+                return
 
         start = time.perf_counter()
         try:
