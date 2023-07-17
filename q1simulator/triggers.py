@@ -1,3 +1,4 @@
+from copy import copy
 import math
 from dataclasses import dataclass
 from typing import List
@@ -14,11 +15,14 @@ class TriggerEvent:
     time: int # time in ns
     state: bool
 
-    def with_delay(self, delay=200, alignment=20):
+    def with_delay(self, delay=220, alignment=28):
         res = self.copy()
         res.time = math.ceil(res.time / alignment) * alignment
         res.time += delay
         return res
+
+    def copy(self):
+        return copy(self)
 
 # TODO Refactor trigger distributor into runtime distributor
 # Run till sequencer calls set_cond. Block it and let others run.

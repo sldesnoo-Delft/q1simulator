@@ -219,7 +219,7 @@ class Renderer:
     def acquire(self, bins, bin_index, wait_after):
         self._update_settings()
         if self.trace_enabled:
-            self._trace(f'Acquire {bins} {bin_index}')
+            self._trace(f'Acquire {bins} {bin_index} ({self.acq_conf.length} ns)')
         self._add_acquisition(bins, bin_index, self.acq_conf.length)
         self._render(wait_after)
 
@@ -279,7 +279,7 @@ class Renderer:
         logger.info(f'mask:    {mask_ar}')
         logger.info(f'state:   {state}')
         logger.info(f'cond:    {match}')
-        self._trace(f'Cond {match}')
+        self._trace(f'Cond {match} {state}')
         self.skip_rt = not match
         self.else_wait = else_wait
 
@@ -434,6 +434,7 @@ class Renderer:
             if self.latch_enabled:
                 index = trigger.addr-1
                 self.latch_regs[index] += trigger.state
+                self._trace(f'Latch reg {index} {trigger.state:+d} -> {self.latch_regs[index]}')
 
     def _get_acq_data(self, bins, default):
         mock_data_iter = self.mock_data.get(bins, None)
@@ -479,10 +480,11 @@ class Renderer:
             self._error('ACQ BINNING FIFO ERROR')
             return
         acq_conf = self.acq_conf
-        value = self._get_acq_data(bins, t)
+        value = self._get_acq_data(bins, t/1e6)
         angle = acq_conf.rotation/180*np.pi
         rot_value = value[0]*np.cos(angle) + value[1]*np.sin(angle)
         state = rot_value >= acq_conf.threshold
+        self._trace(f'Acq result {state}, {rot_value}, {acq_conf.threshold}')
 
         if self.acq_count[bins][bin_index] == 0:
             self.acq_data[bins][bin_index] = value
@@ -496,7 +498,8 @@ class Renderer:
             t_end = t + duration
             trigger_state = state ^ acq_conf.trigger_invert
             # TODO also add to trigger events. Part of TriggerDistributor redesign.
-            self.acq_trigger_events.append(TriggerEvent(acq_conf.addr, t_end, trigger_state))
+            self.acq_trigger_events.append(TriggerEvent(acq_conf.trigger_addr, t_end, trigger_state))
+            self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
 
     def _trace(self, msg):
         if self.trace_enabled:

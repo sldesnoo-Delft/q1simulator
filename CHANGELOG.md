@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.9.2] - 2023-07-17
+
+- Fixed acquisition triggers
+
 ## \[0.9.1] - 2023-07-10
 
 - Added config option render_repetitions to render of repeated sequence only once.
