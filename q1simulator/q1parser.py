@@ -126,7 +126,7 @@ class Q1Parser:
                 label = label[:-1]
             args = match.group(3).strip()
             if args:
-                arglist = args.split(',')
+                arglist = args.replace(' ','').split(',')
             else:
                 arglist = []
             return [label, match.group(2), arglist]
