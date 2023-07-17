@@ -3,7 +3,8 @@ All notable changes to Q1Simulator will be documented in this file.
 
 ## \[0.9.2] - 2023-07-17
 
-- Fixed acquisition triggers
+- Fixed acquisition triggers.
+- Fixed implementation of conditionals and real time counters.
 
 ## \[0.9.1] - 2023-07-10
 
