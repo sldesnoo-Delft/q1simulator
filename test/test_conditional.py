@@ -81,7 +81,7 @@ sim = init()
 sim.reset()
 program='''
 wait_sync 100
-latch_en 1,4
+set_latch_en 1,4
 #Q1Sim:sim_trigger 1, 1
 
 play 0,0,92 # subtract 8 for next conditional

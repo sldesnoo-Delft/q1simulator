@@ -258,10 +258,10 @@ class Q1Core:
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire_weighed(bins, bin_index, weight0, weight1, wait_after)
 
-    def _latch_en(self, enable, wait_after):
+    def _set_latch_en(self, enable, wait_after):
         self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
-        self.renderer.latch_en(enable, wait_after)
+        self.renderer.set_latch_en(enable, wait_after)
 
     def _latch_rst(self, wait):
         self.clock.add_ticks(1)

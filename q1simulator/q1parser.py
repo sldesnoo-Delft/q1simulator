@@ -48,7 +48,7 @@ mnemonic_args = {
     'play': 'IR,IR,I',
     'acquire': 'I,IR,I',
     'acquire_weighed': 'I,IR,IR,IR,I',
-    'latch_en': 'IR,I',
+    'set_latch_en': 'IR,I',
     'latch_rst': 'IR',
     'wait': 'IR',
     'wait_sync': 'IR',

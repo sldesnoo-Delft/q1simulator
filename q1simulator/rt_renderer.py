@@ -286,7 +286,7 @@ class Renderer:
     def _else_wait(self, *args, **kwargs):
         self._render(self.else_wait)
 
-    def latch_en(self, enable, wait_after):
+    def set_latch_en(self, enable, wait_after):
         if self.trace_enabled:
             self._trace(f'Latch {"on" if enable else "off"}')
         self._process_triggers()
