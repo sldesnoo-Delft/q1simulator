@@ -228,6 +228,9 @@ class Q1Simulator(qc.Instrument, Q1Module):
     _pulsar_parameters = [
         'reference_source',
         ]
+    _log_only_params = [
+        'led_brightness',
+        ]
 
     def __init__(self, name, n_sequencers=6, sim_type=None):
         super().__init__(name)
@@ -235,6 +238,10 @@ class Q1Simulator(qc.Instrument, Q1Module):
 
         for par_name in self._pulsar_parameters:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
+
+        for par_name in self._log_only_params:
+            self.add_parameter(par_name,
+                               set_cmd=partial(self._log_set, par_name))
 
     def get_idn(self):
         return dict(vendor='Q1Simulator', model=self._sim_type, serial='', firmware='')
@@ -267,3 +274,6 @@ class Q1Simulator(qc.Instrument, Q1Module):
             seq.set_trigger_events(trigger_dist.get_trigger_events())
             seq.run()
             trigger_dist.add_emitted_triggers(seq.get_acq_trigger_events())
+
+    def _log_set(self, name, value):
+        logger.info(f'{self.name}: {name}={value}')

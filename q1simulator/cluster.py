@@ -25,6 +25,7 @@ class ClusterModule(qc.InstrumentChannel, Q1Module):
     def present(self):
         return True
 
+    @property
     def slot_idx(self):
         return self._slot
 
@@ -41,6 +42,9 @@ class Cluster(qc.Instrument):
     _cluster_parameters = [
         'trigger_monitor_latest',
         ]
+    _log_only_params = [
+        'led_brightness',
+        ]
 
     def __init__(self, name, modules={}):
         super().__init__(name)
@@ -51,6 +55,10 @@ class Cluster(qc.Instrument):
         for i in range(1,16):
             par_name = f'trigger{i}_monitor_count'
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
+
+        for par_name in self._log_only_params:
+            self.add_parameter(par_name,
+                               set_cmd=partial(self._log_set, par_name))
 
         self._modules = {}
         for slot in range(1,21):
@@ -145,3 +153,5 @@ class Cluster(qc.Instrument):
     def reset(self):
         pass
 
+    def _log_set(self, name, value):
+        logger.info(f'{self.name}: {name}={value}')
