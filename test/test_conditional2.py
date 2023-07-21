@@ -250,7 +250,12 @@ start:
   play 1,1,8
   play 1,1,8
   play 1,1,8
-  wait 56 # 6 statements, subtract 4 ns for else
+  play 1,1,8
+  play 1,1,8
+  play 1,1,8
+  play 1,1,8
+  play 1,1,8
+  wait 16 # 10 statements, subtract 4 ns for else: 100-80-4
 
   # set_cond enable, 0b0001, NOR, else_wait
   set_cond 1, 1, 1, 4
