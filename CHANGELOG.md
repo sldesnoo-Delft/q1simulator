@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.9.3] - 2023-07-23
+
+- Added led_brightness of qblox-instruments v0.10.0
+
+Note: Time resolution is still 4 ns. So not yet compatible with v0.10.
+
 ## \[0.9.2] - 2023-07-17
 
 - Fixed acquisition triggers.
