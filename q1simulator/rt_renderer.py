@@ -355,8 +355,8 @@ class Renderer:
     def _render_marker(self, old_marker, new_marker):
         for i in range(4):
             m = 1 << i
-            m_old = old_marker & m
-            m_new = new_marker & m
+            m_old = (old_marker & m) != 0
+            m_new = (new_marker & m) != 0
             if m_new != m_old:
                 l = self.marker_out[i]
                 if self.time < self.max_render_time:
@@ -366,6 +366,10 @@ class Renderer:
                     l += [[self.max_render_time, m_old], [self.max_render_time, 0]]
 
     def _render(self, time):
+        if time < 4:
+            logger.error(f'{self.name}: wait_time ({time} ns) must be >= 4 ns')
+            self._error('WAIT TIME < 4 ns')
+
         if time & 0x0003:
             logger.error(f'{self.name}: wait time not aligned on '
                           f'4 ns boundary: {time} ns (offset={time&0x03} ns)')
