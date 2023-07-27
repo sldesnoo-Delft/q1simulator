@@ -274,11 +274,11 @@ class Renderer:
             match = (bits_set%2) == 0
         else:
             raise Exception(f'Unknown operator {op}')
-        logger.info(f'set_cond 1, {mask}, {op}, {else_wait}')
-        logger.info(f'latches: {self.latch_regs}')
-        logger.info(f'mask:    {mask_ar}')
-        logger.info(f'state:   {state}')
-        logger.info(f'cond:    {match}')
+        logger.debug(f'set_cond 1, {mask}, {op}, {else_wait}')
+        logger.debug(f'latches: {self.latch_regs}')
+        logger.debug(f'mask:    {mask_ar}')
+        logger.debug(f'state:   {state}')
+        logger.debug(f'cond:    {match}')
         self._trace(f'Cond {match} {state}')
         self.skip_rt = not match
         self.else_wait = else_wait
