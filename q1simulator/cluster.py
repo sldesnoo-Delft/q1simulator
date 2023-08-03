@@ -9,6 +9,7 @@ from qblox_instruments import (
         InstrumentClass, InstrumentType,
         )
 
+from .qblox_version import check_qblox_instrument_version
 from .q1simulator import Q1Module
 from .triggers import TriggerDistributor
 from .trigger_sorting import get_seq_trigger_info, sort_sequencers
@@ -47,6 +48,7 @@ class Cluster(qc.Instrument):
         ]
 
     def __init__(self, name, modules={}):
+        check_qblox_instrument_version()
         super().__init__(name)
 
         # TODO return trigger count

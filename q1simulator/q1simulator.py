@@ -74,7 +74,6 @@ class Q1Module(qc.instrument.InstrumentBase):
     # This class is used as a mixin. Although quite heavy mixin.
 
     def init_module(self, n_sequencers=6, sim_type=None):
-        check_qblox_instrument_version()
         self._sim_type = sim_type
         if sim_type is None:
             raise Exception('sim_type must be specified')
@@ -233,6 +232,7 @@ class Q1Simulator(qc.Instrument, Q1Module):
         ]
 
     def __init__(self, name, n_sequencers=6, sim_type=None):
+        check_qblox_instrument_version()
         super().__init__(name)
         super().init_module(n_sequencers, sim_type)
 
