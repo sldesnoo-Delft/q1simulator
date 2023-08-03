@@ -13,6 +13,7 @@ class Instruction:
     reg_args: List[int] = None
     func_name: Optional[str] = None
     func: Any = None
+    clock_ticks: int = 1
 
 
 class AsmSyntaxError(Exception):
@@ -89,6 +90,12 @@ class Q1Parser:
                     args,reg_args = self._evaluate_args(mnemonic_args[mnemonic], instr.arglist)
                     instr.args = args
                     instr.reg_args = reg_args
+                    if reg_args and mnemonic not in ['jmp', 'jge', 'jlt', 'loop']:
+                        # 1 cycle for every register. instr and 1st register are loaded in 1 cycle
+                        instr.clock_ticks = len(reg_args)
+                    else:
+                        # 1 cycle to load instruction
+                        instr.clock_ticks = 1
                 except AsmSyntaxError as ex:
                     print(ex)
                     print(lines[instr.text_line_nr])

@@ -15,6 +15,7 @@ class Abort(Exception):
 class Illegal(Exception):
     pass
 
+
 class Q1Core:
     def __init__(self, name, renderer, is_qrm):
         self.name = name
@@ -80,10 +81,9 @@ class Q1Core:
                     args = instr.args.copy()
                     for i in instr.reg_args:
                         args[i] = self.R[args[i]]
-                        # add 1 clock tick for every register access
-                        self.clock.add_ticks(1)
                 else:
                     args = instr.args
+                self.clock.add_ticks(instr.clock_ticks)
                 instr.func(*args)
                 if self.iptr >= len(self.instructions):
                     raise Illegal(f'No instruction at {self.iptr:04}')
@@ -141,135 +141,138 @@ class Q1Core:
         raise Halt('stop instruction')
 
     def _nop(self):
-        self.clock.add_ticks(1)
+        pass
 
     def _jmp(self, label):
-        self.clock.add_ticks(4)
+        # 3 cycles for jump
+        self.clock.add_ticks(3)
         self.iptr = label
 
     def _jlt(self, value, n, label):
-        self.clock.add_ticks(4)
+        # 2 cycles for arithmetic
+        self.clock.add_ticks(2)
         if value < n:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
             self.iptr = label
 
     def _jge(self, value, n, label):
-        self.clock.add_ticks(4)
+        # 2 cycles for arithmetic
+        self.clock.add_ticks(2)
         if value >= n:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
             self.iptr = label
 
     def _loop(self, register, label):
-        self.clock.add_ticks(5)
+        # 2 cycles for arithmetic
+        self.clock.add_ticks(2)
         self._set_register(register, self.R[register] - 1)
         instr = self.instructions[self.iptr-1]
         if not self.render_repetitions and instr.arglist[1] == '@_start':
             logger.info('Skipping repetitions')
             return
         if self.R[register] != 0:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
             self.iptr = label
 
     def _move(self, source, destination):
-        self.clock.add_ticks(1)
         self._set_register(destination, source)
 
     def _not(self, source, destination):
+        # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         self._set_register(destination, ~source)
 
     def _add(self, lhs, rhs, destination):
+        # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         self._set_register(destination, lhs + rhs)
 
     def _sub(self, lhs, rhs, destination):
+        # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         self._set_register(destination, lhs - rhs)
 
     def _and(self, lhs, rhs, destination):
+        # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         self._set_register(destination, lhs & rhs)
 
     def _or(self, lhs, rhs, destination):
+        # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         self._set_register(destination, lhs | rhs)
 
     def _xor(self, lhs, rhs, destination):
+        # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         self._set_register(destination, lhs ^ rhs)
 
     def _asl(self, lhs, rhs, destination):
+        # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         self._set_register(destination, lhs << rhs)
 
     def _asr(self, lhs, rhs, destination):
+        # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         self._set_register(destination, lhs >> rhs)
 
     def _set_mrk(self, value):
-        self.clock.add_ticks(1)
         self.renderer.set_mrk(value)
 
     def _set_freq(self, freq):
-        self.clock.add_ticks(1)
         self.renderer.set_freq(freq)
 
     def _reset_ph(self):
-        self.clock.add_ticks(1)
         self.renderer.reset_ph()
 
     def _set_ph(self, phase):
-        self.clock.add_ticks(1)
         self.renderer.set_ph(phase)
 
     def _set_ph_delta(self, phase_delta):
-        self.clock.add_ticks(1)
         self.renderer.set_ph_delta(phase_delta)
 
     def _set_awg_gain(self, gain0, gain1):
-        self.clock.add_ticks(1)
         self.renderer.set_awg_gain(gain0, gain1)
 
     def _set_awg_offs(self, offset0, offset1):
-        self.clock.add_ticks(1)
         self.renderer.set_awg_offs(offset0, offset1)
 
     def _set_cond(self, enable, mask, op, else_wait):
         self.renderer.set_cond(enable, mask, op, else_wait)
 
     def _upd_param(self, wait_after):
-        self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.upd_param(wait_after)
 
     def _play(self, wave0, wave1, wait_after):
-        self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.play(wave0, wave1, wait_after)
 
     def _acquire(self, bins, bin_index, wait_after):
         if not self._is_qrm:
             raise NotImplementedError('instrument type is not QRM')
-        self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire(bins, bin_index, wait_after)
 
     def _acquire_weighed(self, bins, bin_index, weight0, weight1, wait_after):
         if not self._is_qrm:
             raise NotImplementedError('instrument type is not QRM')
-        self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire_weighed(bins, bin_index, weight0, weight1, wait_after)
 
     def _set_latch_en(self, enable, wait_after):
-        self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.set_latch_en(enable, wait_after)
 
     def _latch_rst(self, wait):
-        self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.latch_rst(wait)
 
     def _wait(self, time):
-        self.clock.add_ticks(1)
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.wait(time)
 
@@ -307,6 +310,7 @@ class Q1Core:
     def _sim_trigger(self, addr, value):
         self.renderer.sim_trigger(addr, value)
 
+
 class CoreClock:
     def __init__(self):
         self.rt_buffer = deque()
@@ -337,4 +341,4 @@ class CoreClock:
             # So, core time will be equal to popped time
             self.core_time = b.popleft()
 
-        self.rt_buffer.append(time)
+        b.append(time)
