@@ -92,6 +92,7 @@ class Renderer:
         self.delete_acquisition_data_all()
         self.reset()
         self.trace_enabled = False
+        self.skip_wait_sync = True
         self.threshold_count = np.full(15, 2^16-1, dtype=np.uint16)
         self.threshold_invert = np.zeros(15, dtype=bool)
         self.acq_conf = AcqConf()
@@ -247,6 +248,8 @@ class Renderer:
         self._render(time)
 
     def wait_sync(self, wait_after):
+        if self.skip_wait_sync:
+            return
         self._render(wait_after)
 
     def set_cond(self, enable, mask, op, else_wait):
