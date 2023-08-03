@@ -111,6 +111,8 @@ class Q1Sequencer(InstrumentChannel):
             self.rt_renderer.trace_enabled = value
         elif name == 'render_repetitions':
             self.q1core.render_repetitions = value
+        elif name == 'skip_wait_sync':
+            self.rt_renderer.skip_wait_sync = value
 
     def reset(self):
         self.waveforms = {}
