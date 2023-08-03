@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.9.4] - 2023-08-03
+
+- Corrected executing timing according to published Q1ASM specification
+- Skip wait time after wait_sync by default.
+
 ## \[0.9.3] - 2023-07-23
 
 - Added led_brightness of qblox-instruments v0.10.0
