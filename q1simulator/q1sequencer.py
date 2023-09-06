@@ -4,13 +4,15 @@ from dataclasses import dataclass
 import json
 import numpy as np
 from typing import Optional, Iterator, Iterable, Tuple
+from packaging.version import Version
 
 from qcodes.instrument.channel import InstrumentChannel
 
+from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
+
 from .q1core import Q1Core
 from .rt_renderer import Renderer, MockDataEntry
-
-from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
+from .qblox_version import qblox_version
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +38,11 @@ class Q1Sequencer(InstrumentChannel):
         'gain_awg_path1',
         'offset_awg_path0',
         'offset_awg_path1',
+        # -- QRM only
+        'connect_acq_I',
+        'connect_acq_Q',
         ]
     _seq_log_only_parameters_qrm = [
-        # old v0.8 parameters for backwards compatibility
-        # TODO remove in next release.
-        'phase_rotation_acq',
-        'discretization_threshold_acq',
         ]
 
     def __init__(self, parent, name, sim_type):
@@ -70,10 +71,20 @@ class Q1Sequencer(InstrumentChannel):
         self.add_parameter('mixer_corr_gain_ratio', set_cmd=self._set_mixer_gain_ratio)
         self.add_parameter('mixer_corr_phase_offset_degree', set_cmd=self._set_mixer_phase_offset_degree)
 
-        self.add_parameter('channel_map_path0_out0_en',
-                           set_cmd=partial(self._set_channel_map_path_en, 0, 0))
-        self.add_parameter('channel_map_path1_out1_en',
-                           set_cmd=partial(self._set_channel_map_path_en, 1, 1))
+        if qblox_version < Version('0.11'):
+            self.add_parameter('channel_map_path0_out0_en',
+                               set_cmd=partial(self._set_channel_map_path_en, 0, 0))
+            self.add_parameter('channel_map_path1_out1_en',
+                               set_cmd=partial(self._set_channel_map_path_en, 1, 1))
+            if self._is_qcm:
+                self.add_parameter('channel_map_path0_out2_en',
+                                   set_cmd=partial(self._set_channel_map_path_en, 0, 2))
+                self.add_parameter('channel_map_path1_out3_en',
+                                   set_cmd=partial(self._set_channel_map_path_en, 1, 3))
+        else:
+            for i in range(4 if self._is_qcm else 2):
+                self.add_parameter(f'connect_out{i}',
+                                   set_cmd=partial(self._connect_out, i))
 
         for i in range(1,16):
             self.add_parameter(f'trigger{i}_count_threshold',
@@ -81,11 +92,6 @@ class Q1Sequencer(InstrumentChannel):
             self.add_parameter(f'trigger{i}_threshold_invert',
                                set_cmd=partial(self._set_trigger_threshold_invert, i))
 
-        if self._is_qcm:
-            self.add_parameter('channel_map_path0_out2_en',
-                               set_cmd=partial(self._set_channel_map_path_en, 0, 2))
-            self.add_parameter('channel_map_path1_out3_en',
-                               set_cmd=partial(self._set_channel_map_path_en, 1, 3))
         if self._is_qrm:
             self.add_parameter('demod_en_acq', set_cmd=self._set_demod_en_acq)
             self.add_parameter('integration_length_acq', set_cmd=self._set_integratrion_length_acq)
@@ -149,9 +155,19 @@ class Q1Sequencer(InstrumentChannel):
         logger.debug(f'{self.name}: mixer_phase_offset_degree={value}')
         self.rt_renderer.mixer_phase_offset_degree = value
 
-    def _set_channel_map_path_en(self, path, out, value):
-        logger.debug(f'{self.name}: channel_map_path{path}_out{out}_en={value}')
-        self.rt_renderer.path_enable(path, out, value)
+    def _set_channel_map_path_en(self, path, out, enable):
+        logger.debug(f'{self.name}: channel_map_path{path}_out{out}_en={enable}')
+        if not enable:
+            value = 'off'
+        elif path == 0:
+            value = 'I'
+        else:
+            value = 'Q'
+        self.rt_renderer.connect_out(out, value)
+
+    def _connect_out(self, out, value):
+        logger.debug(f'{self.name}: _connect_out{out}={value}')
+        self.rt_renderer.connect_out(out, value)
 
     def _set_trigger_count_threshold(self, address, count):
         self.rt_renderer.set_trigger_count_threshold(address, count)

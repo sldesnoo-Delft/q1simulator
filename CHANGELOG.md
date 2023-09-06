@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.11.0] - 2023-09-06
+
+- Added qblox-instruments v0.11.0 features.
+- Dropped compatibility with qblox-instruments v0.8
+
+Note: Time resolution is still 4 ns.
+
+
 ## \[0.9.4] - 2023-08-03
 
 - Corrected executing timing according to published Q1ASM specification

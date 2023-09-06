@@ -84,7 +84,7 @@ class Renderer:
         self.wavedict = {}
         self.acq_weights = {}
         self.acq_bins = {}
-        self.path_out_enabled = [set(), set()]
+        self.output_selected_path = ['off'] * 4
         self.nco_frequency = 0.0
         self.mod_en_awg = False
         self.mixer_gain_ratio = 1.0
@@ -122,11 +122,8 @@ class Renderer:
         self.skip_rt = False
         self.else_wait = 0
 
-    def path_enable(self, path, out, enable):
-        if enable:
-            self.path_out_enabled[path].add(out)
-        else:
-            self.path_out_enabled[path].discard(out)
+    def connect_out(self, out, value):
+        self.output_selected_path[out] = value
 
     def set_waveforms(self, wavedict):
         self.wavedict_float = wavedict
@@ -428,10 +425,8 @@ class Renderer:
             data0 = path0
             data1 = path1
 
-        if len(self.path_out_enabled[0]):
-            self.out0.append(data0)
-        if len(self.path_out_enabled[1]):
-            self.out1.append(data1)
+        self.out0.append(data0)
+        self.out1.append(data1)
 
     def _process_triggers(self):
         t = self.time
@@ -519,14 +514,15 @@ class Renderer:
             max_ms = self.max_render_time / 1e6
             t_end = self.max_render_time
             print(f'{self.name}: Rendering truncated at {max_ms:3.1f} ms. Total time: {self.time/1e6:4.1f} ms')
-        if len(self.path_out_enabled[0]):
-            out0 = scaling * np.concatenate(self.out0)
-            # print(f'Average V: {np.mean(out0)*1000:5.2f} mV')
-            pt.plot(out0, label=f'{self.name}.{self.path_out_enabled[0]}')
-        if len(self.path_out_enabled[1]):
-            out1 = scaling * np.concatenate(self.out1)
-            # print(f'Average V: {np.mean(out1)*1000:5.2f} mV')
-            pt.plot(out1, label=f'{self.name}.{self.path_out_enabled[1]}')
+        for i,value in enumerate(self.output_selected_path):
+            if value == 'I':
+                out0 = scaling * np.concatenate(self.out0)
+                # print(f'Average V: {np.mean(out0)*1000:5.2f} mV')
+                pt.plot(out0, label=f'{self.name}.out{i}(I)')
+            if value == 'Q':
+                out1 = scaling * np.concatenate(self.out1)
+                # print(f'Average V: {np.mean(out1)*1000:5.2f} mV')
+                pt.plot(out1, label=f'{self.name}.out{i}(Q)')
         for i,m_list in enumerate(self.marker_out):
             if len(m_list) == 0:
                 continue

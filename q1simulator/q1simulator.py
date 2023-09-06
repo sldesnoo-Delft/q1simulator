@@ -22,6 +22,10 @@ class Q1Module(qc.instrument.InstrumentBase):
         'ext_trigger_input_delay',
         'ext_trigger_input_trigger_en',
         'ext_trigger_input_trigger_address',
+        'marker0_inv_en',
+        'marker1_inv_en',
+        'marker2_inv_en',
+        'marker3_inv_en',
         ]
     _sim_parameters_qcm = [
         'out0_offset',
@@ -53,10 +57,14 @@ class Q1Module(qc.instrument.InstrumentBase):
         'scope_acq_sequencer_select',
         'scope_acq_avg_mode_en_path0',
         'scope_acq_avg_mode_en_path1',
+        'in0_offset',
+        'in1_offset',
         ]
     _sim_parameters_qrm_rf = [
         'in0_att',
         'out0_att',
+        'in0_offset_path0',
+        'in0_offset_path1',
         'out0_in0_lo_freq',
         'out0_in0_lo_en',
         'out0_offset_path0',
