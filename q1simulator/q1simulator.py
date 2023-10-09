@@ -17,6 +17,7 @@ from qblox_instruments import (
 
 logger = logging.getLogger(__name__)
 
+
 class Q1Module(qc.instrument.InstrumentBase):
     _module_parameters = [
         'ext_trigger_input_delay',
@@ -93,25 +94,25 @@ class Q1Module(qc.instrument.InstrumentBase):
         if not (self._is_qcm or self._is_qrm):
             raise ValueError(f'Unknown sim_type: {sim_type}')
 
+        sim_params = []
+        sim_params += self._module_parameters
         if sim_type == 'QCM':
-            sim_params = self._sim_parameters_qcm
+            sim_params += self._sim_parameters_qcm
         elif sim_type == 'QCM-RF':
-            sim_params = self._sim_parameters_qcm_rf
+            sim_params += self._sim_parameters_qcm_rf
         elif sim_type == 'QRM':
-            sim_params = self._sim_parameters_qrm
+            sim_params += self._sim_parameters_qrm
         elif sim_type == 'QRM-RF':
             sim_params = self._sim_parameters_qrm_rf
         elif sim_type == 'Viewer':
-            sim_params = list(set(self._sim_parameters_qcm+self._sim_parameters_qrm))
-        else:
-            sim_params = []
+            sim_params += list(set(self._sim_parameters_qcm+self._sim_parameters_qrm))
 
         for par_name in sim_params:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
 
         self.sequencers = [Q1Sequencer(self, f'seq{i}', sim_type)
                            for i in range(n_sequencers)]
-        for i,seq in enumerate(self.sequencers):
+        for i, seq in enumerate(self.sequencers):
             self.add_submodule(f'sequencer{i}', seq)
 
         self.armed_seq = set()
@@ -203,7 +204,7 @@ class Q1Module(qc.instrument.InstrumentBase):
                 seq.plot()
 
     def print_acquisitions(self):
-        for i,seq in enumerate(self.sequencers):
+        for i, seq in enumerate(self.sequencers):
             data = self.get_acquisitions(i)
             if not len(data):
                 continue
@@ -213,19 +214,22 @@ class Q1Module(qc.instrument.InstrumentBase):
 
                 print("  'path0': [",
                       np.array2string(np.array(bins['integration']['path0']),
-                                        prefix=' '*12,
-                                        separator=',',
-                                        threshold=100),']')
+                                      prefix=' '*12,
+                                      separator=',',
+                                      threshold=100),
+                      ']')
                 print("  'path1': [",
                       np.array2string(np.array(bins['integration']['path1']),
                                       prefix=' '*12,
-                                        separator=',',
-                                        threshold=100),']')
+                                      separator=',',
+                                      threshold=100),
+                      ']')
                 print("  'avg_cnt': [",
                       np.array2string(np.array(bins['avg_cnt']),
-                                        prefix=' '*12,
-                                        separator=',',
-                                        threshold=100),']')
+                                      prefix=' '*12,
+                                      separator=',',
+                                      threshold=100),
+                      ']')
 
     def print_registers(self, seq_nr, reg_nrs=None):
         self.sequencers[seq_nr].print_registers(reg_nrs)
