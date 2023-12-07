@@ -265,6 +265,8 @@ class Q1Core:
         self.renderer.acquire_weighed(bins, bin_index, weight0, weight1, wait_after)
 
     def _set_latch_en(self, enable, wait_after):
+        if enable not in [0, 1]:
+            raise ValueError('enable must be 0 or 1')
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.set_latch_en(enable, wait_after)
 

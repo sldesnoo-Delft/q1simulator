@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.11.2] - 2023-12-07
+
+- Added argument check to set_latch_en
+
 ## \[0.11.1] - 2023-10-09
 
 - Fixed module parameter markerX_inv_en
