@@ -4,7 +4,7 @@ packages = ['q1simulator']
 print('packages: {}'.format(packages))
 
 setup(name="q1simulator",
-	version="0.11.1",
+	version="0.11.2",
     description="Simulator for Q1ASM",
     author="Sander de Snoo",
 	packages = find_packages(),
