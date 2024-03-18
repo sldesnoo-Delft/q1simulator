@@ -38,11 +38,12 @@ class Q1Sequencer(InstrumentChannel):
         'gain_awg_path1',
         'offset_awg_path0',
         'offset_awg_path1',
-        # -- QRM only
-        'connect_acq_I',
-        'connect_acq_Q',
         ]
     _seq_log_only_parameters_qrm = [
+        'connect_acq_I',
+        'connect_acq_Q',
+        'nco_prop_delay_comp',
+        'nco_prop_delay_comp_en',
         ]
 
     def __init__(self, parent, name, sim_type):
