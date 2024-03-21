@@ -45,6 +45,11 @@ class Q1Sequencer(InstrumentChannel):
         'nco_prop_delay_comp',
         'nco_prop_delay_comp_en',
         ]
+    _seq_log_only_parameters_qrm_rf = [
+        'connect_acq',
+        'nco_prop_delay_comp',
+        'nco_prop_delay_comp_en',
+        ]
 
     def __init__(self, parent, name, sim_type):
         super().__init__(parent, name)
@@ -53,7 +58,10 @@ class Q1Sequencer(InstrumentChannel):
         self._is_rf = sim_type in ['QCM-RF', 'QRM-RF']
 
         if self._is_qrm:
-            log_params = self._seq_log_only_parameters + self._seq_log_only_parameters_qrm
+            if self._is_rf:
+                log_params = self._seq_log_only_parameters + self._seq_log_only_parameters_qrm_rf
+            else:
+                log_params = self._seq_log_only_parameters + self._seq_log_only_parameters_qrm
             self._v_max = 0.5
         else:
             log_params = self._seq_log_only_parameters
@@ -83,7 +91,10 @@ class Q1Sequencer(InstrumentChannel):
                 self.add_parameter('channel_map_path1_out3_en',
                                    set_cmd=partial(self._set_channel_map_path_en, 1, 3))
         else:
-            for i in range(4 if self._is_qcm else 2):
+            n_out_ch = 4 if self._is_qcm else 2
+            if self._is_rf:
+                n_out_ch //= 2
+            for i in range(n_out_ch):
                 self.add_parameter(f'connect_out{i}',
                                    set_cmd=partial(self._connect_out, i))
 
@@ -238,14 +249,14 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer.set_acquisition_bins(bins_dict)
 
     def _set_rt_mock_data(self):
-        for name,md in self._mock_data.items():
+        for name, md in self._mock_data.items():
             if name not in self.acquisition_bins:
                 logger.warning(f"no acquisition_bins for mock_data '{name}'")
                 continue
             try:
                 data = np.asarray(next(md))
             except StopIteration:
-                raise Exception(f'No more mock data')
+                raise Exception('No more mock data')
             bin_num = int(self.acquisition_bins[name]['index'])
             self.rt_renderer.set_mock_data(bin_num, data)
 

@@ -117,12 +117,15 @@ class Q1Module(qc.instrument.InstrumentBase):
 
         self.armed_seq = set()
         if self._is_qrm:
-            self.in0_gain(0)
-            self.in1_gain(0)
+            if self._is_rf:
+                self.in0_att(0)
+            else:
+                self.in0_gain(0)
+                self.in1_gain(0)
 
     @property
     def module_type(self) -> InstrumentType:
-        return InstrumentType[self._sim_type]
+        return InstrumentType.QCM if self._is_qcm else InstrumentType.QRM
 
     @property
     def is_qcm_type(self):

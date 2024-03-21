@@ -129,7 +129,7 @@ class Renderer:
         self.wavedict_float = wavedict
         self.wavedict = {
                 key:float2int16array(value)
-                for key,value in wavedict.items()
+                for key, value in wavedict.items()
                 }
 
     def set_weights(self, weightsdict):
@@ -251,7 +251,7 @@ class Renderer:
 
     def set_cond(self, enable, mask, op, else_wait):
         if not enable:
-            self._trace(f'Cond disabled')
+            self._trace('Cond disabled')
             self.skip_rt = False
             return
         self._process_triggers()
@@ -514,16 +514,16 @@ class Renderer:
             max_ms = self.max_render_time / 1e6
             t_end = self.max_render_time
             print(f'{self.name}: Rendering truncated at {max_ms:3.1f} ms. Total time: {self.time/1e6:4.1f} ms')
-        for i,value in enumerate(self.output_selected_path):
-            if value == 'I':
+        for i, value in enumerate(self.output_selected_path):
+            if value in ('I', 'IQ'):
                 out0 = scaling * np.concatenate(self.out0)
                 # print(f'Average V: {np.mean(out0)*1000:5.2f} mV')
                 pt.plot(out0, label=f'{self.name}.out{i}(I)')
-            if value == 'Q':
+            if value in ('Q', 'IQ'):
                 out1 = scaling * np.concatenate(self.out1)
                 # print(f'Average V: {np.mean(out1)*1000:5.2f} mV')
                 pt.plot(out1, label=f'{self.name}.out{i}(Q)')
-        for i,m_list in enumerate(self.marker_out):
+        for i, m_list in enumerate(self.marker_out):
             if len(m_list) == 0:
                 continue
             l = [[0,0]]

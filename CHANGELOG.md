@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.11.4] - 2024-03-21
+
+- Fixed RF module connect in/out for qblox-instruments v0.11+.
+
 ## \[0.11.3] - 2024-03-18
 
 - Added nco_prop_delay_comp.
