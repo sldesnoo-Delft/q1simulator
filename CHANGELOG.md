@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
-## \[0.11.4] - 2024-03-21
+## \[0.11.5] - 2024-03-27
 
 - Fixed q1viewer for qblox-instruments 0.11+.
 - q1viewer now by default ignores sequence repetition and wait_sync time.
