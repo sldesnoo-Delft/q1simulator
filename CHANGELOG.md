@@ -3,6 +3,11 @@ All notable changes to Q1Simulator will be documented in this file.
 
 ## \[0.11.4] - 2024-03-21
 
+- Fixed q1viewer for qblox-instruments 0.11+.
+- q1viewer now by default ignores sequence repetition and wait_sync time.
+
+## \[0.11.4] - 2024-03-21
+
 - Fixed RF module connect in/out for qblox-instruments v0.11+.
 
 ## \[0.11.3] - 2024-03-18

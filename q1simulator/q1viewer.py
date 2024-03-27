@@ -1,10 +1,12 @@
 import sys
 from dataclasses import dataclass, field
+from packaging.version import Version
 from typing import List, Optional
 
 import matplotlib.pyplot as pt
 
 from .q1simulator import Q1Simulator
+from .qblox_version import qblox_version
 
 
 @dataclass
@@ -19,20 +21,27 @@ def plot_q1asm_file(filename,
                     out=[0,1],
                     lo_frequency=None,
                     max_render_time=2e6,
-                    max_core_cycles=1e7):
+                    max_core_cycles=1e7,
+                    render_repetitions=False,
+                    skip_wait_sync=True):
     plot = PlotDef(filename, out=out, lo_frequency=lo_frequency)
     plot_q1asm_files([plot],
                      max_render_time=max_render_time,
-                     max_core_cycles=max_core_cycles)
+                     max_core_cycles=max_core_cycles,
+                     render_repetitions=render_repetitions,
+                     skip_wait_sync=skip_wait_sync)
 
 
 def plot_q1asm_files(plot_defs,
                      max_render_time=2e6,
-                     max_core_cycles=1e7):
-
+                     max_core_cycles=1e7,
+                     render_repetitions=False,
+                     skip_wait_sync=True):
     sim = Q1Simulator('sim', n_sequencers=len(plot_defs), sim_type='Viewer')
     sim.config('max_render_time', max_render_time)
     sim.config('max_core_cycles', max_core_cycles)
+    sim.config('render_repetitions', render_repetitions)
+    sim.config('skip_wait_sync', skip_wait_sync)
 
     for i,plot in enumerate(plot_defs):
 # FIXME
@@ -48,9 +57,13 @@ def plot_q1asm_files(plot_defs,
 
         for ch in plot.out:
             path = ch % 2
-            sequencer.set(f'channel_map_path{path}_out{ch}_en', True)
+            if qblox_version < Version('0.11'):
+                sequencer.set(f'channel_map_path{path}_out{ch}_en', True)
+            else:
+                sequencer.set(f'connect_out{ch}', 'I' if path == 0 else 'Q')
 
         sequencer.set('sequence', plot.filename)
+        sequencer.sync_en(True)
 
         sim.arm_sequencer(i)
 
