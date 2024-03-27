@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.11.6] - 2024-03-27
+
+- Fixed sequencer.sequence(s) if s is Path.
+
 ## \[0.11.5] - 2024-03-27
 
 - Fixed q1viewer for qblox-instruments 0.11+.

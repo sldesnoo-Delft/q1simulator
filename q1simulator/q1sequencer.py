@@ -206,12 +206,12 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer.set_thresholded_acq_trigger_invert(value)
 
     def upload(self, sequence):
-        if isinstance(sequence, str):
+        if isinstance(sequence, dict):
+            pdict = sequence
+        else:
             filename = sequence
             with open(filename) as fp:
                 pdict = json.load(fp)
-        else:
-            pdict = sequence
         waveforms = pdict['waveforms']
         weights = pdict['weights']
         acquisitions = pdict['acquisitions']
