@@ -387,7 +387,7 @@ class Renderer:
         if t_end > self.max_render_time:
             t_end = self.max_render_time
 
-        t_render = t_end - t_start
+        t_render = int(t_end - t_start)
 
         s = self.settings
 
@@ -395,11 +395,11 @@ class Renderer:
         path1 = np.full(t_render, s.awg_offs1, dtype=np.int16)
 
         if self.waves_end[0] > t_start:
-            end = min(self.waves_end[0], t_end)
+            end = int(min(self.waves_end[0], t_end))
             data = self.waves[0][t_start-self.wave_start:end-self.wave_start]
             path0[0:len(data)] += (int(_i16(s.awg_gain0)) * data // 2**15)
         if self.waves_end[1] > t_start:
-            end = min(self.waves_end[1], t_end)
+            end = int(min(self.waves_end[1], t_end))
             data = self.waves[1][t_start-self.wave_start:end-self.wave_start]
             path1[0:len(data)] += (int(_i16(s.awg_gain1)) * data // 2**15)
 
