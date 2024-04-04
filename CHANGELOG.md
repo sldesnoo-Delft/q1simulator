@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.11.7] - 2024-04-04
+
+- Use sequencer label for plotting.
+- Fixed exception during plotting when max_render_time is reached and max_render_time is a float.
+
 ## \[0.11.6] - 2024-03-27
 
 - Fixed sequencer.sequence(s) if s is Path.

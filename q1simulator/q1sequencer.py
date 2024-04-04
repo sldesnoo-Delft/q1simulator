@@ -117,10 +117,7 @@ class Q1Sequencer(InstrumentChannel):
         self.reset()
 
     def config(self, name, value):
-        if name == 'name':
-            self.name = value
-            self.rt_renderer.name = value
-        elif name == 'max_render_time':
+        if name == 'max_render_time':
             self.rt_renderer.max_render_time = value
         elif name == 'max_core_cycles':
             self.q1core.max_core_cycles = value
@@ -398,7 +395,7 @@ class Q1Sequencer(InstrumentChannel):
         self._trigger_events = events
 
     def plot(self):
-        self.rt_renderer.plot(self._v_max)
+        self.rt_renderer.plot(self._v_max, plot_label=self.label)
 
     def print_registers(self, reg_nrs=None):
         self.q1core.print_registers(reg_nrs)

@@ -79,7 +79,7 @@ class Renderer:
 
     def __init__(self, name):
         self.name = name
-        self.max_render_time = 2_000_000
+        self._max_render_time = 2_000_000
         self.wavedict_float = {}
         self.wavedict = {}
         self.acq_weights = {}
@@ -305,6 +305,14 @@ class Renderer:
         index = int(addr)-1
         self.latch_regs[index] += int(value)
 
+    @property
+    def max_render_time(self):
+        return self._max_render_time
+
+    @max_render_time.setter
+    def max_render_time(self, value):
+        self._max_render_time = int(value)
+
     def _error(self, msg):
         logger.error(f'{self.name}: {msg}')
         self.errors.add(msg)
@@ -385,7 +393,7 @@ class Renderer:
         if t_start > self.max_render_time:
             return
         if t_end > self.max_render_time:
-            t_end = self.max_render_time
+            t_end = int(self.max_render_time)
 
         t_render = t_end - t_start
 
@@ -507,22 +515,39 @@ class Renderer:
         if self.trace_enabled:
             print(f'{self.time:-6} {msg}')
 
-    def plot(self, v_max):
+    def plot(self, v_max, plot_label):
         scaling = v_max/2**15
         t_end = self.time
         if self.time > self.max_render_time:
             max_ms = self.max_render_time / 1e6
             t_end = self.max_render_time
             print(f'{self.name}: Rendering truncated at {max_ms:3.1f} ms. Total time: {self.time/1e6:4.1f} ms')
+
+        n_ch_out = 0
+        for value in self.output_selected_path:
+            if value in ['I', 'Q']:
+                n_ch_out += 1
+            if value == 'IQ':
+                n_ch_out += 2
+        if n_ch_out == 0:
+            print(f'No outputs enabled for {self.name}')
+
         for i, value in enumerate(self.output_selected_path):
+            label = plot_label
+            if label == self.name:
+                label += f'.out{i}'
             if value in ('I', 'IQ'):
+                if n_ch_out > 1:
+                    label += '-I'
                 out0 = scaling * np.concatenate(self.out0)
                 # print(f'Average V: {np.mean(out0)*1000:5.2f} mV')
-                pt.plot(out0, label=f'{self.name}.out{i}(I)')
+                pt.plot(out0, label=label)
             if value in ('Q', 'IQ'):
+                if n_ch_out > 1:
+                    label += '-Q'
                 out1 = scaling * np.concatenate(self.out1)
                 # print(f'Average V: {np.mean(out1)*1000:5.2f} mV')
-                pt.plot(out1, label=f'{self.name}.out{i}(Q)')
+                pt.plot(out1, label=label)
         for i, m_list in enumerate(self.marker_out):
             if len(m_list) == 0:
                 continue
@@ -530,7 +555,8 @@ class Renderer:
             l += m_list
             l.append([t_end,0])
             line = np.array(l).T
-            pt.plot(line[0], line[1], ':', label=f'{self.name}.M{i}')
+            label = plot_label + f'-M{i}'
+            pt.plot(line[0], line[1], ':', label=label)
 
     def set_mock_data(self, bins, data: Iterable[Sequence[float]]):
         self.mock_data[bins] = iter(data)

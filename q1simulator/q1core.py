@@ -57,7 +57,7 @@ class Q1Core:
         self.clock.add_ticks(-10)
 
         if len(self.instructions) == 0:
-            print(f'*** No instructions loaded')
+            print('*** No instructions loaded')
             self._error('SEQUENCE PROCESSOR Q1 ILLEGAL INSTRUCTION')
             return
 

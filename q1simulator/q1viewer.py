@@ -43,10 +43,9 @@ def plot_q1asm_files(plot_defs,
     sim.config('render_repetitions', render_repetitions)
     sim.config('skip_wait_sync', skip_wait_sync)
 
-    for i,plot in enumerate(plot_defs):
-# FIXME
-#        if plot.sequencer_name:
-#            sim.config_seq(i, 'name', plot.sequencer_name)
+    for i, plot in enumerate(plot_defs):
+        if plot.sequencer_name:
+            sim.sequencers[i].label = plot.sequencer_name
 
         sequencer = getattr(sim, f'sequencer{i}')
         if plot.lo_frequency is None:
@@ -85,6 +84,7 @@ def plot_q1asm_files(plot_defs,
 def main(argv):
     plot_q1asm_file(argv[0])
     pt.show()
+
 
 if __name__ == "__main__":
    main(sys.argv[1:])
