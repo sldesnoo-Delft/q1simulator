@@ -1,4 +1,4 @@
-__version__ = "0.11.6"
+__version__ = "0.11.7"
 
 from .q1simulator import Q1Simulator
 from .cluster import Cluster, ClusterModule
