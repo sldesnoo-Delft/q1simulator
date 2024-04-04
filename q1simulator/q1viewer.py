@@ -23,20 +23,29 @@ def plot_q1asm_file(filename,
                     max_render_time=2e6,
                     max_core_cycles=1e7,
                     render_repetitions=False,
-                    skip_wait_sync=True):
+                    skip_wait_sync=True,
+                    t_min=None,
+                    t_max=None,
+                    ):
     plot = PlotDef(filename, out=out, lo_frequency=lo_frequency)
     plot_q1asm_files([plot],
                      max_render_time=max_render_time,
                      max_core_cycles=max_core_cycles,
                      render_repetitions=render_repetitions,
-                     skip_wait_sync=skip_wait_sync)
+                     skip_wait_sync=skip_wait_sync,
+                     t_min=t_min,
+                     t_max=t_max,
+                     )
 
 
 def plot_q1asm_files(plot_defs,
                      max_render_time=2e6,
                      max_core_cycles=1e7,
                      render_repetitions=False,
-                     skip_wait_sync=True):
+                     skip_wait_sync=True,
+                     t_min=None,
+                     t_max=None,
+                     ):
     sim = Q1Simulator('sim', n_sequencers=len(plot_defs), sim_type='Viewer')
     sim.config('max_render_time', max_render_time)
     sim.config('max_core_cycles', max_core_cycles)
@@ -74,7 +83,7 @@ def plot_q1asm_files(plot_defs,
         print(f'State {name}: {sim.get_sequencer_state(i)}')
 
     pt.figure()
-    sim.plot()
+    sim.plot(t_min=t_min, t_max=t_max)
     pt.legend()
 
     sim.print_acquisitions()

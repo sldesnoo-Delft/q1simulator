@@ -31,7 +31,7 @@ class Q1Core:
 
     def load(self, program):
         parser = Q1Parser()
-        self.lines,self.instructions = parser.parse(program)
+        self.lines, self.instructions = parser.parse(program)
 
     def get_used_triggers(self):
         '''

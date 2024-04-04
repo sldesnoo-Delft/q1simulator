@@ -200,11 +200,11 @@ class Q1Module(qc.instrument.InstrumentBase):
         for seq in self.sequencers:
             seq.config(name, value)
 
-    def plot(self, **kwargs):
+    def plot(self, t_min=None, t_max=None, **kwargs):
         for seq in self.sequencers:
             # assume only sequencers in sync mode have executed.
             if seq.sync_en():
-                seq.plot()
+                seq.plot(t_min=t_min, t_max=t_max)
 
     def print_acquisitions(self):
         for i, seq in enumerate(self.sequencers):

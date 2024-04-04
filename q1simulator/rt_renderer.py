@@ -515,13 +515,23 @@ class Renderer:
         if self.trace_enabled:
             print(f'{self.time:-6} {msg}')
 
-    def plot(self, v_max, plot_label):
+    def plot(self, v_max, plot_label, t_min=None, t_max=None):
+        def time_window(out, t_min, t_max):
+            if t_max is not None:
+                out = out[:t_max]
+            if t_min is not None:
+                out = out[t_min:]
+            return out
+
         scaling = v_max/2**15
         t_end = self.time
         if self.time > self.max_render_time:
             max_ms = self.max_render_time / 1e6
             t_end = self.max_render_time
             print(f'{self.name}: Rendering truncated at {max_ms:3.1f} ms. Total time: {self.time/1e6:4.1f} ms')
+
+        if t_min is not None:
+            t = np.arange(t_min, min(t_max, t_end) if t_max is not None else t_end)
 
         n_ch_out = 0
         for value in self.output_selected_path:
@@ -540,14 +550,22 @@ class Renderer:
                 if n_ch_out > 1:
                     label += '-I'
                 out0 = scaling * np.concatenate(self.out0)
+                out0 = time_window(out0, t_min, t_max)
                 # print(f'Average V: {np.mean(out0)*1000:5.2f} mV')
-                pt.plot(out0, label=label)
+                if t_min is None:
+                    pt.plot(out0, label=label)
+                else:
+                    pt.plot(t, out0, label=label)
             if value in ('Q', 'IQ'):
                 if n_ch_out > 1:
                     label += '-Q'
                 out1 = scaling * np.concatenate(self.out1)
+                out1 = time_window(out1, t_min, t_max)
                 # print(f'Average V: {np.mean(out1)*1000:5.2f} mV')
-                pt.plot(out1, label=label)
+                if t_min is None:
+                    pt.plot(out1, label=label)
+                else:
+                    pt.plot(t, out1, label=label)
         for i, m_list in enumerate(self.marker_out):
             if len(m_list) == 0:
                 continue
@@ -557,6 +575,13 @@ class Renderer:
             line = np.array(l).T
             label = plot_label + f'-M{i}'
             pt.plot(line[0], line[1], ':', label=label)
+        limits = {}
+        if t_min is not None:
+            limits['left'] = t_min
+        if t_max is not None:
+            limits['right'] = t_max
+        if limits:
+            pt.xlim(**limits)
 
     def set_mock_data(self, bins, data: Iterable[Sequence[float]]):
         self.mock_data[bins] = iter(data)
