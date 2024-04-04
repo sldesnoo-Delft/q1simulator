@@ -14,7 +14,7 @@ class PlotDef:
     filename: str
     sequencer_name: Optional[str] = None
     out: List[int] = field(default_factory=lambda:[0,1])
-    lo_frequency: float = None
+    lo_frequency: Optional[float] = None
 
 
 def plot_q1asm_file(filename,
@@ -42,6 +42,7 @@ def plot_q1asm_files(plot_defs,
     sim.config('max_core_cycles', max_core_cycles)
     sim.config('render_repetitions', render_repetitions)
     sim.config('skip_wait_sync', skip_wait_sync)
+    sim.ignore_triggers = True
 
     for i, plot in enumerate(plot_defs):
         if plot.sequencer_name:

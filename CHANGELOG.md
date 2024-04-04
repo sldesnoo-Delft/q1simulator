@@ -5,6 +5,7 @@ All notable changes to Q1Simulator will be documented in this file.
 
 - Use sequencer label for plotting.
 - Fixed exception during plotting when max_render_time is reached and max_render_time is a float.
+- Added ignore_triggers to q1viewer.
 
 ## \[0.11.6] - 2024-03-27
 

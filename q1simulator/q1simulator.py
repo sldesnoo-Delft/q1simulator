@@ -257,6 +257,7 @@ class Q1Simulator(qc.Instrument, Q1Module):
         for par_name in self._log_only_params:
             self.add_parameter(par_name,
                                set_cmd=partial(self._log_set, par_name))
+        self.ignore_triggers = False
 
     def get_idn(self):
         return dict(vendor='Q1Simulator', model=self._sim_type, serial='', firmware='')
@@ -282,13 +283,18 @@ class Q1Simulator(qc.Instrument, Q1Module):
                     get_seq_trigger_info(self, seq_number, self.sequencers[seq_number])
                     )
 
-        trigger_dist = TriggerDistributor()
-        seq_infos = sort_sequencers(seq_infos)
-        for seq_info in seq_infos:
-            seq = seq_info.module.sequencers[seq_info.seq_number]
-            seq.set_trigger_events(trigger_dist.get_trigger_events())
-            seq.run()
-            trigger_dist.add_emitted_triggers(seq.get_acq_trigger_events())
+        if self.ignore_triggers:
+            for seq_info in seq_infos:
+                seq = seq_info.module.sequencers[seq_info.seq_number]
+                seq.run()
+        else:
+            trigger_dist = TriggerDistributor()
+            seq_infos = sort_sequencers(seq_infos)
+            for seq_info in seq_infos:
+                seq = seq_info.module.sequencers[seq_info.seq_number]
+                seq.set_trigger_events(trigger_dist.get_trigger_events())
+                seq.run()
+                trigger_dist.add_emitted_triggers(seq.get_acq_trigger_events())
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
