@@ -1,14 +1,15 @@
 import logging
 from typing import List
 from dataclasses import dataclass
-from collections import defaultdict
+
+from .q1sequencer import Q1Sequencer
+
 
 logger = logging.getLogger(__name__)
 
 @dataclass
 class SequencerTriggerInfo:
-    module: int
-    seq_number: int
+    sequencer: Q1Sequencer
     emitted_triggers: int
     ''' bits for emitted trigger.
     0b00001010 for triggers 2 and 4.
@@ -18,14 +19,13 @@ class SequencerTriggerInfo:
     0b00001010 for triggers 2 and 4.
     '''
 
-def get_seq_trigger_info(module, seq_number, sequencer):
+def get_seq_trigger_info(sequencer):
     if hasattr(sequencer,'thresholded_acq_trigger_en') and sequencer.thresholded_acq_trigger_en():
         emitted_triggers = 1 << (sequencer.thresholded_acq_trigger_address() - 1)
     else:
         emitted_triggers = 0
     return SequencerTriggerInfo(
-            module,
-            seq_number,
+            sequencer,
             emitted_triggers,
             sequencer.get_used_triggers()
             )
@@ -69,5 +69,4 @@ def sort_sequencers(sequencers: List[SequencerTriggerInfo]):
         if len(unsorted) == n_start:
             raise Exception(f"Sorting sequencers on triggers failed. Unsorted: {unsorted}")
 
-    print('Sorted', result)
     return result

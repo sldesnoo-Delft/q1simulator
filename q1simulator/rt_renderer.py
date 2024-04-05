@@ -512,6 +512,7 @@ class Renderer:
             else:
                 trigger_state = self.acq_trigger_value
             # TODO also add to trigger events. Part of TriggerDistributor redesign.
+            # FIXME: own trigger is not counted.
             self.acq_trigger_events.append(TriggerEvent(acq_conf.trigger_addr, t_end, trigger_state))
             self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
 

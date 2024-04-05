@@ -1,6 +1,6 @@
 import logging
 from functools import partial
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import qcodes as qc
@@ -14,6 +14,7 @@ from qblox_instruments import (
         SystemStatus, SystemState, SystemStatusSlotFlags,
         InstrumentClass, InstrumentType,
         )
+
 
 logger = logging.getLogger(__name__)
 
@@ -275,26 +276,31 @@ class Q1Simulator(qc.Instrument, Q1Module):
             self.sequencers[sequencer].run()
             return
 
-        # collect sequencers and sort on used triggers
-        # TODO Refactor trigger distribution in runtime distribution.
-        seq_infos = []
-        for seq_number in self.armed_seq:
-            seq_infos.append(
-                    get_seq_trigger_info(self, seq_number, self.sequencers[seq_number])
-                    )
 
-        if self.ignore_triggers:
-            for seq_info in seq_infos:
-                seq = seq_info.module.sequencers[seq_info.seq_number]
-                seq.run()
-        else:
-            trigger_dist = TriggerDistributor()
-            seq_infos = sort_sequencers(seq_infos)
-            for seq_info in seq_infos:
-                seq = seq_info.module.sequencers[seq_info.seq_number]
-                seq.set_trigger_events(trigger_dist.get_trigger_events())
-                seq.run()
-                trigger_dist.add_emitted_triggers(seq.get_acq_trigger_events())
+        # Get list of armed sequencers
+        # pass to sequence executor
+
+        sequencers = [self.sequencers[seq_number] for seq_number in self.armed_seq]
+        run_sequencers(sequencers, self.ignore_triggers)
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
+
+
+def run_sequencers(sequencers: List[Q1Sequencer], ignore_triggers=False):
+    if ignore_triggers:
+        for seq in sequencers:
+            seq.run()
+        return
+
+    # sort on used triggers
+
+    # TODO Refactor trigger distribution in runtime distribution.
+    seq_infos = [get_seq_trigger_info(seq) for seq in sequencers]
+    trigger_dist = TriggerDistributor()
+    seq_infos = sort_sequencers(seq_infos)
+    for seq_info in seq_infos:
+        seq = seq_info.sequencer
+        seq.set_trigger_events(trigger_dist.get_trigger_events())
+        seq.run()
+        trigger_dist.add_emitted_triggers(seq.get_acq_trigger_events())

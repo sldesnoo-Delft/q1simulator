@@ -47,8 +47,10 @@ class TestCluster:
         for module in [self.qcm, self.qrm]:
             seq = module.sequencers[0]
             seq.connect_out0('I')
+            seq.label = f"{module.name}-0"
             seq = module.sequencers[1]
             seq.connect_out1('Q')
+            seq.label = f"{module.name}-1"
         for num in [0,1]:
             seq = self.qrm.sequencers[num]
             seq.thresholded_acq_trigger_en(False)
@@ -92,8 +94,8 @@ class TestCluster:
         self.cluster.start_sequencer()
         if self.sim:
             pt.figure()
-            self.qrm.plot()
             self.qcm.plot()
+            self.qrm.plot()
             pt.legend()
             pt.grid(True)
 
@@ -105,10 +107,10 @@ def qcm_program(used_triggers):
     return f'''
     move {n_rep},R1
     wait_sync 100
-    start:
+    _start:
       set_latch_en 1, 100
       set_awg_gain 32767,32767
-      set_mrk 15
+      set_mrk 1
       play 0,0,100
       set_mrk 0
       play 3,3,100
@@ -129,7 +131,7 @@ def qcm_program(used_triggers):
       set_cond 0, 0, 0, 0
       play 3,3,96
       latch_rst 4
-    loop R1,@start
+    loop R1,@_start
     stop
     '''
 
@@ -141,11 +143,12 @@ def qrm_program(used_triggers):
     return f'''
     move {n_rep},R1
     wait_sync 100
-    start:
-      acquire 0, 0, 100
-      set_latch_en 1, 100
+    _start:
+      set_latch_en 1, 4
+      acquire 0, 0, 96
       set_awg_gain 32767,32767
       play 0,0,100
+      play 3,3,100
       wait 92 # subtract 8 for next conditional
 
       # set_cond enable, mask, OR, else_wait
@@ -163,7 +166,7 @@ def qrm_program(used_triggers):
       set_cond 0, 0, 0, 0
       play 3,3,96
       latch_rst 4
-    loop R1,@start
+    loop R1,@_start
     stop
     '''
 
@@ -186,6 +189,9 @@ sim.load(False, 0, qrm_program([]), acquisitions=acquisitions, waveforms=wavefor
 sim.trigger_out(0, 1, 0.0)
 sim.load(False, 1, qrm_program([]), acquisitions=acquisitions, waveforms=waveforms)
 sim.trigger_out(1, 2, 0.0)
+sim.cluster.config('acq_trigger_value', 0)
+sim.run()
+sim.cluster.config('acq_trigger_value', 1)
 sim.run()
 
 # %%
@@ -198,6 +204,9 @@ sim.load(False, 0, qrm_program([2]), acquisitions=acquisitions, waveforms=wavefo
 sim.trigger_out(0, 1, 0.0)
 sim.load(False, 1, qrm_program([]), acquisitions=acquisitions, waveforms=waveforms)
 sim.trigger_out(1, 2, 0.0)
+sim.cluster.config('acq_trigger_value', 0)
+sim.run()
+sim.cluster.config('acq_trigger_value', 1)
 sim.run()
 
 # %%
@@ -210,6 +219,9 @@ sim.load(False, 0, qrm_program([2]), acquisitions=acquisitions, waveforms=wavefo
 sim.trigger_out(0, 1, 0.0)
 sim.load(False, 1, qrm_program([2]), acquisitions=acquisitions, waveforms=waveforms)
 sim.trigger_out(1, 2, 0.0)
+sim.cluster.config('acq_trigger_value', 0)
+sim.run()
+sim.cluster.config('acq_trigger_value', 1)
 sim.run()
 
 # %%
@@ -222,6 +234,9 @@ sim.load(False, 0, qrm_program([1, 2]), acquisitions=acquisitions, waveforms=wav
 sim.trigger_out(0, 1, 0.0)
 sim.load(False, 1, qrm_program([2]), acquisitions=acquisitions, waveforms=waveforms)
 sim.trigger_out(1, 2, 0.0)
+sim.cluster.config('acq_trigger_value', 0)
+sim.run()
+sim.cluster.config('acq_trigger_value', 1)
 sim.run()
 
 # %%
@@ -234,6 +249,9 @@ sim.load(False, 0, qrm_program([1, 2]), acquisitions=acquisitions, waveforms=wav
 sim.trigger_out(0, 1, 0.0)
 sim.load(False, 1, qrm_program([2, 9]), acquisitions=acquisitions, waveforms=waveforms)
 sim.trigger_out(1, 2, 0.0)
+sim.cluster.config('acq_trigger_value', 0)
+sim.run()
+sim.cluster.config('acq_trigger_value', 1)
 sim.run()
 
 
