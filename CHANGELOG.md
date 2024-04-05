@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.11.8] - 2024-04-@@@
+
+- Added setting `acq_trigger_value` to simulate with all acquisitions sending a trigger (or not).
+
 ## \[0.11.7] - 2024-04-04
 
 - Use sequencer label for plotting.

@@ -93,6 +93,7 @@ class Renderer:
         self.reset()
         self.trace_enabled = False
         self.skip_wait_sync = True
+        self.acq_trigger_value = None
         self.threshold_count = np.full(15, 2^16-1, dtype=np.uint16)
         self.threshold_invert = np.zeros(15, dtype=bool)
         self.acq_conf = AcqConf()
@@ -506,7 +507,10 @@ class Renderer:
 
         if acq_conf.trigger_en:
             t_end = t + duration
-            trigger_state = state ^ acq_conf.trigger_invert
+            if self.acq_trigger_value is None:
+                trigger_state = state ^ acq_conf.trigger_invert
+            else:
+                trigger_state = self.acq_trigger_value
             # TODO also add to trigger events. Part of TriggerDistributor redesign.
             self.acq_trigger_events.append(TriggerEvent(acq_conf.trigger_addr, t_end, trigger_state))
             self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')

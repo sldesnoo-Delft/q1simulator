@@ -128,6 +128,8 @@ class Q1Sequencer(InstrumentChannel):
             self.q1core.render_repetitions = value
         elif name == 'skip_wait_sync':
             self.rt_renderer.skip_wait_sync = value
+        elif name == 'acq_trigger_value':
+            self.rt_renderer.acq_trigger_value = value
 
     def reset(self):
         self.waveforms = {}
