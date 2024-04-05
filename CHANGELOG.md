@@ -4,6 +4,7 @@ All notable changes to Q1Simulator will be documented in this file.
 ## \[0.11.8] - 2024-04-@@@
 
 - Added setting `acq_trigger_value` to simulate with all acquisitions sending a trigger (or not).
+- Improved trigger distribution even allowing conditions on triggers that are never emitted.
 
 ## \[0.11.7] - 2024-04-04
 
