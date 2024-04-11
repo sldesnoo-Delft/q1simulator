@@ -5,6 +5,7 @@ All notable changes to Q1Simulator will be documented in this file.
 
 - Added setting `acq_trigger_value` to simulate with all acquisitions sending a trigger (or not).
 - Improved trigger distribution even allowing conditions on triggers that are never emitted.
+- Set max output voltage of q1viewer to 2.5 V (equal to QCM)
 
 ## \[0.11.7] - 2024-04-04
 

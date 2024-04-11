@@ -67,6 +67,9 @@ class Q1Sequencer(InstrumentChannel):
             log_params = self._seq_log_only_parameters
             self._v_max = 2.5
 
+        if sim_type == 'Viewer':
+            self._v_max = 2.5
+
         if self._is_rf:
             self._v_max = 3.3
 
