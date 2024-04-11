@@ -202,6 +202,9 @@ class Q1Module(qc.instrument.InstrumentBase):
         for seq in self.sequencers:
             seq.config(name, value)
 
+    def get_simulation_end_time(self):
+        return max(seq.get_simulation_end_time() for seq in self.sequencers)
+
     def plot(self,
              t_min: float = None,
              t_max: float = None,

@@ -148,6 +148,9 @@ class Q1Sequencer(InstrumentChannel):
         self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm)
         self.reset_trigger_thresholding()
 
+    def get_simulation_end_time(self):
+        return self.rt_renderer.time
+
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
 

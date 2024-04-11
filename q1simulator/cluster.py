@@ -95,6 +95,13 @@ class Cluster(qc.Instrument):
             [],
             SystemStatusSlotFlags({}))
 
+    def get_connected_modules(self, filter_fn=None):
+        result = {}
+        for slot, module in self._modules.items():
+            if module.present():
+                result[slot] = module
+        return result
+
     def _check_module_present(self, slot):
         if not self._modules[slot].present():
             raise Exception(f'No module in slot {slot}')
@@ -107,19 +114,15 @@ class Cluster(qc.Instrument):
             self._check_module_present(slot)
             self._modules[slot].arm_sequencer(sequencer)
         else:
-            for module in self._modules.values():
-                if module.present():
-                    module.arm_sequencer(sequencer)
+            for module in self.get_connected_modules().values():
+                module.arm_sequencer(sequencer)
 
     def start_sequencer(self, slot: Optional[int] = None, sequencer: Optional[int] = None) -> None:
         if slot is not None:
             self._check_module_present(slot)
             modules = [self._modules[slot]]
         else:
-            modules = [
-                    module for module in self._modules.values()
-                    if module.present()
-                    ]
+            modules = self.get_connected_modules().values()
 
         # Get list of armed sequencers
         # pass to sequence executor
@@ -136,9 +139,8 @@ class Cluster(qc.Instrument):
             self._check_module_present(slot)
             self._modules[slot].stop_sequencer(sequencer)
         else:
-            for module in self._modules.values():
-                if module.present():
-                    module.stop_sequencer(sequencer)
+            for module in self.get_connected_modules().values():
+                module.stop_sequencer(sequencer)
 
     @property
     def modules(self):
@@ -151,9 +153,11 @@ class Cluster(qc.Instrument):
         logger.info(f'{self.name}: {name}={value}')
 
     def config(self, name, value):
-        for module in self._modules.values():
-            if module.present():
-                module.config(name, value)
+        for module in self.get_connected_modules().values():
+            module.config(name, value)
+
+    def get_simulation_end_time(self):
+        return max(module.get_simulation_end_time() for module in self.get_connected_modules().values())
 
     def plot(self,
              t_min: Optional[float] = None,
@@ -180,9 +184,7 @@ class Cluster(qc.Instrument):
             pt.grid(True)
             pt.xlabel('[ns]')
             pt.ylabel('[V]')
-        for slot, module in self._modules.items():
-            if not module.present():
-                continue
+        for slot, module in self.get_connected_modules().items():
             if modules is not None and slot not in modules:
                 # skip module
                 continue

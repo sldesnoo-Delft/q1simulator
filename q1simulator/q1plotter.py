@@ -125,7 +125,7 @@ class Q1Plotter:
                     sim_seq = module.sequencers[iseq]
                     enabled = self._copy_settings(cluster_seq, sim_seq, module.is_qcm_type)
                     if enabled:
-                        print("arm", slot, iseq)
+                        print(f"Generating output for slot {slot}, sequencer {iseq}: {sim_seq.label}")
                         module.arm_sequencer(iseq)
 
         self._simulator.start_sequencer()
@@ -153,9 +153,13 @@ class Q1Plotter:
                 If False only pyplot.plot() is called without creating figure or setting axis labels.
                 If "modules" creates a new figure per module.
         """
-        if t_max > self.max_render_time:
+        end_time = self._simulator.get_simulation_end_time()
+        if t_max is not None and t_max > self.max_render_time:
             print(f"The output has only been computed till t={self.max_render_time}. "
                   "Set `max_render_time` and call `regenerate()` to get more data.")
+        if t_min is not None and t_min > end_time:
+            print(f"The simulation ended at t={end_time}")
+
         self._simulator.plot(
             t_min=t_min,
             t_max=t_max,
@@ -225,12 +229,3 @@ class Q1Plotter:
                 sim_seq.set(param_name, value)
 
         return True
-
-# %%
-
-if False:
-
-    # %%
-    from q1simulator import Q1Plotter
-    plotter = Q1Plotter(context.station.Qblox)
-    plotter.plot()

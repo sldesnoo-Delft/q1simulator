@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.11.9] - 2024-04-11
+
+- Cleanup and fixes of Q1Plotter.
+
 ## \[0.11.8] - 2024-04-11
 
 - Added Q1Plotter which plots the output of a cluster based on its current program and settings.
