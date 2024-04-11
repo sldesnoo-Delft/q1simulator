@@ -1,8 +1,9 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
-## \[0.11.8] - 2024-04-@@@
+## \[0.11.8] - 2024-04-11
 
+- Added Q1Plotter which plots the output of a cluster based on its current program and settings.
 - Added setting `acq_trigger_value` to simulate with all acquisitions sending a trigger (or not).
 - Improved trigger distribution even allowing conditions on triggers that are never emitted.
 - Set max output voltage of q1viewer to 2.5 V (equal to QCM)

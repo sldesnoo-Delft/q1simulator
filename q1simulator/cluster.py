@@ -1,7 +1,8 @@
 import logging
-from typing import Optional
+from typing import Optional, Union, List
 from functools import partial
 
+import matplotlib.pyplot as pt
 import qcodes as qc
 
 from qblox_instruments import (
@@ -153,3 +154,43 @@ class Cluster(qc.Instrument):
         for module in self._modules.values():
             if module.present():
                 module.config(name, value)
+
+    def plot(self,
+             t_min: Optional[float] = None,
+             t_max: Optional[float] = None,
+             channels: Union[None, List[str], List[int]] = None,
+             modules: Optional[List[int]] = None,
+             create_figure: Union[bool, str] = True,
+             **kwargs):
+        """Plots the simulated output of the cluster.
+
+        Args:
+            t_min: minimum time in the plot.
+            t_max: maximum time in the plot.
+            channels: If not None specifies the channels to plot by name or sequencer number.
+            modules: If not None specifies the modules to plot by slot number.
+            create_figure:
+                If True create a new figure.
+                If False only pyplot.plot() is called without creating figure or setting axis labels.
+                If "modules" creates a new figure per module.
+        """
+        if create_figure == True:
+            pt.figure()
+            pt.title('Cluster')
+            pt.grid(True)
+            pt.xlabel('[ns]')
+            pt.ylabel('[V]')
+        for slot, module in self._modules.items():
+            if not module.present():
+                continue
+            if modules is not None and slot not in modules:
+                # skip module
+                continue
+            if create_figure == "module":
+                pt.figure()
+                pt.title(module.label)
+                pt.grid(True)
+                pt.xlabel('[ns]')
+                pt.ylabel('[V]')
+            module.plot(t_min=t_min, t_max=t_max, channels=channels)
+            pt.legend()

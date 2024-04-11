@@ -1,8 +1,9 @@
 import logging
 from functools import partial
-from typing import Optional, List
+from typing import Optional, List, Union
 
 import numpy as np
+import matplotlib.pyplot as pt
 import qcodes as qc
 
 from .q1sequencer import Q1Sequencer
@@ -201,8 +202,15 @@ class Q1Module(qc.instrument.InstrumentBase):
         for seq in self.sequencers:
             seq.config(name, value)
 
-    def plot(self, t_min=None, t_max=None, **kwargs):
-        for seq in self.sequencers:
+    def plot(self,
+             t_min: float = None,
+             t_max: float = None,
+             channels: Union[None, List[str], List[int]] = None,
+             **kwargs):
+        for i, seq in enumerate(self.sequencers):
+            if channels is not None and i not in channels and seq.label not in channels:
+                # skip channel
+                continue
             # assume only sequencers in sync mode have executed.
             if seq.sync_en():
                 seq.plot(t_min=t_min, t_max=t_max)
@@ -276,7 +284,6 @@ class Q1Simulator(qc.Instrument, Q1Module):
             self.sequencers[sequencer].run()
             return
 
-
         # Get list of armed sequencers
         # pass to sequence executor
 
@@ -285,6 +292,18 @@ class Q1Simulator(qc.Instrument, Q1Module):
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
+
+    def plot(self,
+             t_min: float = None,
+             t_max: float = None,
+             channels: Union[None, List[str], List[int]] = None,
+             **kwargs):
+        pt.figure()
+        super().plot(t_min=t_min, t_max=t_max, channels=channels)
+        pt.grid(True)
+        pt.legend()
+        pt.xlabel('[ns]')
+        pt.ylabel('[V]')
 
 
 def run_sequencers(sequencers: List[Q1Sequencer], ignore_triggers=False):

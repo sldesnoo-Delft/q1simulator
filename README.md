@@ -1,7 +1,7 @@
 # Q1Simulator
 Simulator to execute Q1ASM and render the output channels.
 The simulator can be used like a `Pulsar` or `Cluster` object
-of `qblox_instruments`, where the Cluster can contain 
+of `qblox_instruments`, where the Cluster can contain
 QCM, QRM, QCM-RF and QRM-RF modules.
 The simulator can be used with other Python software to test the
 generation of Q1ASM programs without using the actual hardware.
@@ -53,9 +53,21 @@ specified in a dictionary with  slot number and module type.
 
     qcm2 = cluster.module2
     qcm2.sequence('program.json')
-	
-	cluster.arm_sequencer()
-	cluster.start_sequencer()
+
+    cluster.arm_sequencer()
+    cluster.start_sequencer()
+
+# Q1Plotter
+
+Q1Plotter retrieves the settings from a cluster and runs a simulation of 
+the program to plot the expected outputs.
+
+    from q1simulator import Q1Plotter
+ 
+    plotter = Q1Plotter(my_cluster)
+    plotter.plot()
+
+
 
 
 # Q1ASM file viewer
@@ -96,8 +108,13 @@ The limits can be changed:
 
 
 # Implemented methods
+Q1Simulator checks the installed version of qblox_instruments and mimics the
+API of that version.
+
 The following QCM/QRM methods and parameters are implemented by
-the simulator and mimic behavior of the device:
+the simulator and mimic behavior of the cluster / module / sequencer:
+- module_type
+- is_qcm_type, is_qrm_type, is_rf_type
 - reset
 - get_system_state
 - get_num_system_error
@@ -109,19 +126,32 @@ the simulator and mimic behavior of the device:
 - get_acquisition_state
 - get_acquisitions
 - delete_acquisition_data
-- start_adc_calib
-- sequencer0.nco_freq
-- sequencer0.mod_en_awg
-- sequencer0.demod_en_acq
-- sequencer0.channel_map_path0_out0_en
-- sequencer0.channel_map_path1_out1_en
-- sequencer0.channel_map_path0_out2_en
-- sequencer0.channel_map_path1_out3_en
-- sequencer0.sequence
-- sequencer0.mixer_corr_gain_ratio
-- sequencer0.mixer_corr_phase_offset_degree
 
-All other parameters only print the passed value.
+Simulated sequencer parameters:
+- nco_freq
+- mod_en_awg
+- demod_en_acq
+- channel_map_path0_out0_en ( < v0.11)
+- channel_map_path1_out1_en ( < v0.11)
+- channel_map_path0_out2_en ( < v0.11)
+- channel_map_path1_out3_en ( < v0.11)
+- connect_out0 (v0.11+)
+- connect_out1 (v0.11+)
+- connect_out2 (v0.11+)
+- connect_out3 (v0.11+)
+- sequence
+- mixer_corr_gain_ratio
+- mixer_corr_phase_offset_degree
+- triggerXX_count_threshold
+- triggerXX_threshold_invert
+- integration_length_acq
+- thresholded_acq_rotation
+- thresholded_acq_threshold
+- thresholded_acq_trigger_en
+- thresholded_acq_trigger_address
+- thresholded_acq_trigger_invert
+
+All other methods and parameters only write the passed value to the logger.
 
 # Setting simulator acquisition data
 Acquisition mock data can be set with `set_acquisition_mock_data`.
@@ -170,19 +200,24 @@ Example:
     sim.sequencers[0].set_acquisition_mock_data(None)
 
 # Conditional execution
-The simulator generates triggers according to the acquisition thresholds. 
-At startup the simulator determines the dependencies between trigger producers 
+The simulator generates triggers according to the acquisition thresholds.
+At startup the simulator determines the dependencies between trigger producers
 and trigger consumers. It executes the trigger producing sequencers
 before the trigger consuming sequencers.
 
 The simulator takes the trigger network latency into account, but does not
-check whether triggers overlap. 
+check whether triggers overlap.
 
+The configuration setting `acq_trigger_value` allows to evaluate the sequence
+for a specified trigger value. `sim.config('acq_trigger_value', 1)` sends a trigger
+after every acquisition. `sim.config('acq_trigger_value', 0)` sends no triggers.
+If `acq_trigger_value` is None then the simulator uses the threshold on the 
+acquisition data.
 
 # Simulator output
 The simulator has some methods to show the simulator output.
 - `plot()` shows pyplot charts with the rendered output.
-- `config(render_repetitions=False)` stops rendering when main sequence is executed once.
+- `config("skip_loops", ("_start", ))` stops rendering when Q1Pulse main sequence is executed once.
 - `print_acquisitions()` prints the path0 and path1 data and average counts.
 - `print_registers()` prints the contents of the Q1 registers.
 
