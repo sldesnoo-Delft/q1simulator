@@ -22,7 +22,7 @@ class Q1Core:
         self.renderer = renderer
         self._is_qrm = is_qrm
         self.max_core_cycles= 10_000_000
-        self.render_repetitions = True
+        self.skip_loops = ("_start", )
         self.R = [0]*64
         self.lines = []
         self.instructions = []
@@ -169,8 +169,9 @@ class Q1Core:
         self.clock.add_ticks(2)
         self._set_register(register, self.R[register] - 1)
         instr = self.instructions[self.iptr-1]
-        if not self.render_repetitions and instr.arglist[1] == '@_start':
-            logger.info('Skipping repetitions')
+        jump_label = instr.arglist[1][1:]
+        if jump_label in self.skip_loops:
+            logger.info(f'Skipping loop on {jump_label}')
             return
         if self.R[register] != 0:
             # 3 cycles for jump

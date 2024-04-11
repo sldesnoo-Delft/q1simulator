@@ -128,7 +128,9 @@ class Q1Sequencer(InstrumentChannel):
             self._trace = value
             self.rt_renderer.trace_enabled = value
         elif name == 'render_repetitions':
-            self.q1core.render_repetitions = value
+            self.q1core.skip_loops = ("_start", ) if value else ()
+        elif name == 'skip_loops':
+            self.q1core.skip_loops = value
         elif name == 'skip_wait_sync':
             self.rt_renderer.skip_wait_sync = value
         elif name == 'acq_trigger_value':

@@ -49,7 +49,7 @@ def plot_q1asm_files(plot_defs,
     sim = Q1Simulator('sim', n_sequencers=len(plot_defs), sim_type='Viewer')
     sim.config('max_render_time', max_render_time)
     sim.config('max_core_cycles', max_core_cycles)
-    sim.config('render_repetitions', render_repetitions)
+    sim.config('skip_loops', () if render_repetitions else ("_start", ))
     sim.config('skip_wait_sync', skip_wait_sync)
     sim.ignore_triggers = True
 
