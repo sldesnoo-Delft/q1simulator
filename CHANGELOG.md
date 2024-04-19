@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.11.10] - 2024-04-19
+
+- Added acq_trigger_value to Q1Plotter initializer.
+
 ## \[0.11.9] - 2024-04-11
 
 - Cleanup and fixes of Q1Plotter.

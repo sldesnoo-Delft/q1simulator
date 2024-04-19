@@ -19,6 +19,7 @@ class Q1Plotter:
                  max_core_cycles=1e7,
                  skip_loops = ("_start", ),
                  skip_wait_sync=True,
+                 acq_trigger_value=0,
                  ):
 
         self._cluster = cluster
@@ -27,7 +28,7 @@ class Q1Plotter:
         self.max_core_cycles = max_core_cycles
         self.skip_loops = skip_loops
         self.skip_wait_sync = skip_wait_sync
-        self.acq_trigger_value = None
+        self.acq_trigger_value = acq_trigger_value
 
         self.load()
 

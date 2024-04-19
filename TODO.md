@@ -20,3 +20,10 @@
 ## Renderer
 
 - Add 1 ns resolution
+
+## Q1Core / Renderer
+
+- Add pause/resume
+- Run sequencers concurrently (multiple threads?)
+- Distribute triggers to sequencers running 'concurrently'
+

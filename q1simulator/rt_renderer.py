@@ -545,7 +545,7 @@ class Renderer:
             if value == 'IQ':
                 n_ch_out += 2
         if n_ch_out == 0:
-            print(f'No outputs enabled for {self.name}')
+            print(f'No outputs enabled for {plot_label}')
 
         for i, value in enumerate(self.output_selected_path):
             label = plot_label
