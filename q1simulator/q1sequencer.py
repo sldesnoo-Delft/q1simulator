@@ -4,15 +4,26 @@ from dataclasses import dataclass
 import json
 import numpy as np
 from typing import Optional, Iterator, Iterable, Tuple
-from packaging.version import Version
 
 from qcodes.instrument.channel import InstrumentChannel
 
-from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
+from .qblox_version import qblox_version, Version
+
+if qblox_version >= Version('0.12'):
+    from qblox_instruments import (
+        SequencerStatus,
+        SequencerStatuses,
+        SequencerStates,
+        SequencerStatusFlags,
+        )
+    if qblox_version < Version('0.14'):
+        from qblox_instruments import SequencerStatusOld
+else:
+    from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
 
 from .q1core import Q1Core
 from .rt_renderer import Renderer, MockDataEntry
-from .qblox_version import qblox_version
+
 
 logger = logging.getLogger(__name__)
 
@@ -267,17 +278,65 @@ class Q1Sequencer(InstrumentChannel):
             bin_num = int(self.acquisition_bins[name]['index'])
             self.rt_renderer.set_mock_data(bin_num, data)
 
-    def get_state(self):
-        flags = list(self.q1core.errors | self.rt_renderer.errors)
-        return SequencerState(
-            SequencerStatus[self.run_state],
-            [SequencerStatusFlags[flag.replace(' ','_')] for flag in flags],
-        )
+    if qblox_version < Version('0.14'):
+        if qblox_version < Version('0.12'):
+            def get_state(self):
+                flags = [
+                    SequencerStatusFlags[flag.replace(' ','_')]
+                    for flag in self.q1core.errors | self.rt_renderer.errors
+                    ]
+                if self._is_qrm:
+                    flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
+                return SequencerState(
+                    SequencerStatus[self.run_state],
+                    flags,
+                )
+        else:
+            # deprecated Old version
+            def get_state(self):
+                flags = [
+                    SequencerStatusFlags[flag.replace(' ','_')]
+                    for flag in self.q1core.errors | self.rt_renderer.errors
+                    ]
+                if self._is_qrm:
+                    flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
+                return SequencerState(
+                    SequencerStatusOld[self.run_state],
+                    flags,
+                )
 
-    def get_acquisition_state(self):
-        if not self._is_qrm:
-            raise NotImplementedError('Instrument type is not QRM')
-        return True
+    if qblox_version < Version('0.14'):
+        def get_acquisition_state(self):
+            if not self._is_qrm:
+                raise NotImplementedError('Instrument type is not QRM')
+            return True
+
+    if qblox_version >= Version('0.12'):
+        def get_status(self):
+            info_flags = []
+            warn_flags = []
+            error_flags = [
+                SequencerStatusFlags[flag.replace(' ','_')]
+                for flag in self.q1core.errors | self.rt_renderer.errors
+                ]
+            log = []
+            if self._is_qrm:
+                info_flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
+
+            return SequencerStatus(
+                SequencerStatuses.OKAY,
+                SequencerStates[self.run_state],
+                info_flags,
+                warn_flags,
+                error_flags,
+                log,
+            )
+
+    if qblox_version >= Version('0.12'):
+        def get_acquisition_status(self):
+            if not self._is_qrm:
+                raise NotImplementedError('Instrument type is not QRM')
+            return True
 
     def set_trigger_thresholding(self, address: int, count: int, invert: bool) -> None:
         self.rt_renderer.set_trigger_count_threshold(address, count)

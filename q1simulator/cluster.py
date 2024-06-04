@@ -6,12 +6,23 @@ import matplotlib.pyplot as pt
 import qcodes as qc
 
 from qblox_instruments import (
-        SystemStatus, SystemState, SystemStatusSlotFlags,
         InstrumentClass, InstrumentType,
         )
 
-from .qblox_version import check_qblox_instrument_version
+from .qblox_version import check_qblox_instrument_version, qblox_version, Version
 from .q1simulator import Q1Module, run_sequencers
+
+
+if qblox_version >= Version('0.12'):
+    from qblox_instruments import (
+        SystemStatuses, SystemStatus, SystemStatusSlotFlags,
+        )
+    if qblox_version < Version('0.14'):
+        from qblox_instruments import SystemState, SystemStatusOld
+else:
+    from qblox_instruments import (
+        SystemState, SystemStatus, SystemStatusSlotFlags
+        )
 
 
 logger = logging.getLogger(__name__)
@@ -89,11 +100,25 @@ class Cluster(qc.Instrument):
     def get_system_error(self):
         return '0,"No error"'
 
-    def get_system_state(self):
-        return SystemState(
-            SystemStatus.OKAY,
-            [],
-            SystemStatusSlotFlags({}))
+    if qblox_version >= Version('0.12'):
+        def get_system_status(self):
+            return SystemStatus(
+                SystemStatuses.OKAY,
+                [],
+                SystemStatusSlotFlags({}))
+
+        if qblox_version < Version('0.14'):
+            def get_system_state(self):
+                return SystemState(
+                    SystemStatusOld.OKAY,
+                    [],
+                    SystemStatusSlotFlags({}))
+    else:
+        def get_system_state(self):
+            return SystemState(
+                SystemStatus.OKAY,
+                [],
+                SystemStatusSlotFlags({}))
 
     def get_connected_modules(self, filter_fn=None):
         result = {}
@@ -108,6 +133,20 @@ class Cluster(qc.Instrument):
 
     def _set(self, name, value):
         logger.info(f'{self.name}:{name}={value}')
+
+    if qblox_version < Version('0.14'):
+        def get_sequencer_state(self, slot, seq_nr, timeout=0):
+            return self._modules[slot].get_sequencer_state(seq_nr, timeout)
+
+        def get_acquisition_state(self, slot, seq_nr, timeout=0):
+            return self.self._modules[slot].get_acquisition_state(seq_nr, timeout)
+
+    if qblox_version >= Version('0.12'):
+        def get_sequencer_status(self, slot, seq_nr, timeout=0):
+            return self._modules[slot].get_sequencer_status(seq_nr, timeout)
+
+        def get_acquisition_status(self, slot, seq_nr, timeout=0):
+            return self.self._modules[slot].get_acquisition_status(seq_nr, timeout)
 
     def arm_sequencer(self, slot: Optional[int] = None, sequencer: Optional[int] = None) -> None:
         if slot is not None:

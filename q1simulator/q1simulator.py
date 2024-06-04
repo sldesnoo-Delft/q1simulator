@@ -7,13 +7,23 @@ import matplotlib.pyplot as pt
 import qcodes as qc
 
 from .q1sequencer import Q1Sequencer
-from .qblox_version import check_qblox_instrument_version
+from .qblox_version import check_qblox_instrument_version, qblox_version, Version
 from .triggers import TriggerDistributor
 from .trigger_sorting import get_seq_trigger_info, sort_sequencers
 
 from qblox_instruments import (
-        SystemStatus, SystemState, SystemStatusSlotFlags,
         InstrumentClass, InstrumentType,
+        )
+
+if qblox_version >= Version('0.12'):
+    from qblox_instruments import (
+        SystemStatuses, SystemStatus, SystemStatusSlotFlags,
+        )
+    if qblox_version < Version('0.14'):
+        from qblox_instruments import SystemState, SystemStatusOld
+else:
+    from qblox_instruments import (
+        SystemState, SystemStatus, SystemStatusSlotFlags
         )
 
 
@@ -159,12 +169,6 @@ class Q1Module(qc.instrument.InstrumentBase):
     def get_system_error(self):
         return '0,"No error"'
 
-    def get_system_state(self):
-        return SystemState(
-            SystemStatus.OKAY,
-            [],
-            SystemStatusSlotFlags({}))
-
     def arm_sequencer(self, seq_nr):
         self.armed_seq.add(seq_nr)
         self.sequencers[seq_nr].arm()
@@ -177,11 +181,19 @@ class Q1Module(qc.instrument.InstrumentBase):
     def stop_sequencer(self, sequencer: Optional[int] = None):
         self.armed_seq = set()
 
-    def get_sequencer_state(self, seq_nr, timeout=0):
-        return self.sequencers[seq_nr].get_state()
+    if qblox_version < Version('0.14'):
+        def get_sequencer_state(self, seq_nr, timeout=0):
+            return self.sequencers[seq_nr].get_state()
 
-    def get_acquisition_state(self, seq_nr, timeout=0):
-        return self.sequencers[seq_nr].get_acquisition_state()
+        def get_acquisition_state(self, seq_nr, timeout=0):
+            return self.sequencers[seq_nr].get_acquisition_state()
+
+    if qblox_version >= Version('0.12'):
+        def get_sequencer_status(self, seq_nr, timeout=0):
+            return self.sequencers[seq_nr].get_status()
+
+        def get_acquisition_status(self, seq_nr, timeout=0):
+            return self.sequencers[seq_nr].get_acquisition_status()
 
     def get_acquisitions(self, seq_nr, timeout=0):
         return self.sequencers[seq_nr].get_acquisition_data()
@@ -281,6 +293,26 @@ class Q1Simulator(qc.Instrument, Q1Module):
     @property
     def instrument_type(self):
         return InstrumentType[self._sim_type]
+
+    if qblox_version >= Version('0.12'):
+        def get_system_status(self):
+            return SystemStatus(
+                SystemStatuses.OKAY,
+                [],
+                SystemStatusSlotFlags({}))
+
+        if qblox_version < Version('0.14'):
+            def get_system_state(self):
+                return SystemState(
+                    SystemStatusOld.OKAY,
+                    [],
+                    SystemStatusSlotFlags({}))
+    else:
+        def get_system_state(self):
+            return SystemState(
+                SystemStatus.OKAY,
+                [],
+                SystemStatusSlotFlags({}))
 
     def start_sequencer(self, sequencer: Optional[int] = None):
         if sequencer is not None:
