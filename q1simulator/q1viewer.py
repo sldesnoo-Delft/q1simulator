@@ -82,7 +82,6 @@ def plot_q1asm_files(plot_defs,
         name = plot.sequencer_name if plot.sequencer_name else f'seq{i}'
         print(f'State {name}: {sim.get_sequencer_state(i)}')
 
-    pt.figure()
     sim.plot(t_min=t_min, t_max=t_max)
     pt.legend()
 
