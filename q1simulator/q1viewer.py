@@ -83,8 +83,6 @@ def plot_q1asm_files(plot_defs,
         print(f'State {name}: {sim.get_sequencer_state(i)}')
 
     sim.plot(t_min=t_min, t_max=t_max)
-    pt.legend()
-
     sim.print_acquisitions()
 
     sim.close()
