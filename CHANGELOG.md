@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.13.0] - 2024-06-05
+
+- Changed deprecated get_XXX_state to get_XXX_status
+
 ## \[0.11.10] - 2024-04-19
 
 - Added acq_trigger_value to Q1Plotter initializer.

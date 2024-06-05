@@ -1,9 +1,5 @@
 # TODO for Q1Simulator
 
-## Implement changes qblox-instruments v0.12
-
-- get_XXX_state -> get_XXX_status
-
 ## Q1Plotter
 
 - retrieve acquisitions from cluster and set in simulator
