@@ -124,7 +124,7 @@ class Q1Plotter:
                 for iseq in range(6):
                     cluster_seq = cluster_mod.sequencers[iseq]
                     sim_seq = module.sequencers[iseq]
-                    enabled = self._copy_settings(cluster_seq, sim_seq, module.is_qcm_type)
+                    enabled = self._copy_settings(cluster_seq, sim_seq, module.is_qcm_type, module.is_rf_type)
                     if enabled:
                         print(f"Generating output for slot {slot}, sequencer {iseq}: {sim_seq.label}")
                         module.arm_sequencer(iseq)
@@ -169,7 +169,7 @@ class Q1Plotter:
             create_figure=create_figure)
 
     @staticmethod
-    def _copy_settings(cluster_seq, sim_seq, is_qcm):
+    def _copy_settings(cluster_seq, sim_seq, is_qcm, is_rf):
         sim_seq.sync_en(cluster_seq.sync_en.cache())
         if not sim_seq.sync_en():
             return False
@@ -183,6 +183,13 @@ class Q1Plotter:
         param_names = [
                 "mod_en_awg",
                 "nco_freq",
+                'marker_ovr_en',
+                'marker_ovr_value',
+                'nco_phase_offs',
+                'gain_awg_path0',
+                'gain_awg_path1',
+                'offset_awg_path0',
+                'offset_awg_path1',
                 ]
 
         for i in range(1,16):
@@ -191,17 +198,12 @@ class Q1Plotter:
                 f'trigger{i}_threshold_invert',
                 ]
 
-
         if qblox_version >= Version('0.11'):
-            param_names += [
-                "connect_out0",
-                "connect_out1",
-                ]
-            if is_qcm:
-                param_names += [
-                    "connect_out2",
-                    "connect_out3",
-                    ]
+            n_out_ch = 4 if is_qcm else 2
+            if is_rf:
+                n_out_ch //= 2
+            for ch in range(n_out_ch):
+                param_names += [f"connect_out{ch}"]
         else:
             param_names += [
                 'channel_map_path0_out0_en',
