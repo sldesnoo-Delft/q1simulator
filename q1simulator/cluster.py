@@ -186,7 +186,8 @@ class Cluster(qc.Instrument):
         return list(self.submodules.values())
 
     def reset(self):
-        pass
+        for module in self.get_connected_modules().values():
+            module.reset()
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
