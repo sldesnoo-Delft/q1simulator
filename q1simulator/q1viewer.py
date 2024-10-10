@@ -80,7 +80,10 @@ def plot_q1asm_files(plot_defs,
 
     for i,plot in enumerate(plot_defs):
         name = plot.sequencer_name if plot.sequencer_name else f'seq{i}'
-        print(f'State {name}: {sim.get_sequencer_state(i)}')
+        if qblox_version < Version("0.12"):
+            print(f'State {name}: {sim.get_sequencer_state(i)}')
+        else:
+            print(f'State {name}: {sim.get_sequencer_status(i)}')
 
     sim.plot(t_min=t_min, t_max=t_max)
     sim.print_acquisitions()
