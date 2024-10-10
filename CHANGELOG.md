@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.13.1] - 2024-10-10
+
+- Fixed Cluster.reset()
+- Implemented qcodes params 'nco_phase_offs', 'gain_awg_path0', 'offset_awg_path0'
+
 ## \[0.13.0] - 2024-06-05
 
 - Changed deprecated get_XXX_state to get_XXX_status
