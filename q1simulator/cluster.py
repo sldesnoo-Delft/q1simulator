@@ -235,3 +235,4 @@ class Cluster(qc.Instrument):
                 pt.ylabel('[V]')
             module.plot(t_min=t_min, t_max=t_max, channels=channels)
             pt.legend()
+        pt.show()

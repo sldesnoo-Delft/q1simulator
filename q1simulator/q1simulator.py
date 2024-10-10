@@ -339,6 +339,7 @@ class Q1Simulator(qc.Instrument, Q1Module):
         pt.legend()
         pt.xlabel('[ns]')
         pt.ylabel('[V]')
+        pt.show()
 
 
 def run_sequencers(sequencers: List[Q1Sequencer], ignore_triggers=False):
