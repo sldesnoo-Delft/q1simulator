@@ -11,15 +11,13 @@ from .qblox_version import qblox_version, Version
 
 if qblox_version >= Version('0.12'):
     from qblox_instruments import (
-        SequencerStatus,
         SequencerStatuses,
         SequencerStates,
-        SequencerStatusFlags,
         )
     if qblox_version < Version('0.14'):
         from qblox_instruments import SequencerStatusOld
-else:
-    from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
+
+from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
 
 from .q1core import Q1Core
 from .rt_renderer import Renderer, MockDataEntry
@@ -36,7 +34,6 @@ class Q1Sequencer(InstrumentChannel):
     _seq_log_only_parameters = [
         # -- only printed:
         'sync_en',
-        'nco_phase_offs',
         'marker_ovr_en',
         'marker_ovr_value',
         'cont_mode_en_awg_path0',
@@ -45,10 +42,6 @@ class Q1Sequencer(InstrumentChannel):
         'cont_mode_waveform_idx_awg_path1',
         'upsample_rate_awg_path0',
         'upsample_rate_awg_path1',
-        'gain_awg_path0',
-        'gain_awg_path1',
-        'offset_awg_path0',
-        'offset_awg_path1',
         ]
     _seq_log_only_parameters_qrm = [
         'connect_acq_I',
@@ -87,6 +80,11 @@ class Q1Sequencer(InstrumentChannel):
         for par_name in log_params:
             self.add_parameter(par_name,
                                set_cmd=partial(self._log_set, par_name))
+
+        self.add_parameter('nco_phase_offs', set_cmd=self._nco_phase_offs)
+        for i in range(2):
+            self.add_parameter(f'gain_awg_path{i}', set_cmd=partial(self._gain_awg, path=i))
+            self.add_parameter(f'offset_awg_path{i}', set_cmd=partial(self._offset_awg, path=i))
 
         self.add_parameter('sequence', set_cmd=self.upload)
         self.add_parameter('mod_en_awg', set_cmd=self._set_mod_en_awg)
@@ -139,7 +137,7 @@ class Q1Sequencer(InstrumentChannel):
             self._trace = value
             self.rt_renderer.trace_enabled = value
         elif name == 'render_repetitions':
-            self.q1core.skip_loops = ("_start", ) if value else ()
+            self.q1core.skip_loops = ("_start", ) if not value else ()
         elif name == 'skip_loops':
             self.q1core.skip_loops = value
         elif name == 'skip_wait_sync':
@@ -164,6 +162,17 @@ class Q1Sequencer(InstrumentChannel):
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
+
+    def _nco_phase_offs(self, degrees):
+        self.rt_renderer.set_ph((degrees / 360) % 1 * 1e9)
+
+    def _gain_awg(self, gain, path):
+        value = int(gain*32767)
+        self.rt_renderer.gain_awg_path(value, path)
+
+    def _offset_awg(self, offset, path):
+        value = int(offset*32767)
+        self.rt_renderer.offset_awg_path(value, path)
 
     def _set_mod_en_awg(self, value):
         logger.debug(f'{self.name}: mod_en_awg={value}')

@@ -1,7 +1,7 @@
 import logging
 from copy import copy
 from dataclasses import dataclass
-from typing import Optional, Sequence, Iterable, Union, List
+from typing import Sequence, Iterable
 from numbers import Number
 from collections.abc import Sequence as AbcSequence
 from functools import wraps
@@ -11,21 +11,23 @@ import matplotlib.pyplot as pt
 
 from .triggers import TriggerEvent
 
+
 logger = logging.getLogger(__name__)
 
-MockDataEntry = Union[float, complex, Sequence[float]]
+MockDataEntry = float | complex | Sequence[float]
+
 
 @dataclass
 class Settings:
     marker : int = 0
     awg_offs0 : int = 0
     awg_offs1 : int = 0
-    awg_gain0 : int = 0
-    awg_gain1 : int = 0
+    awg_gain0 : int = 32767
+    awg_gain1 : int = 32767
     reset_phase : bool = False
-    relative_phase: Optional[float] = None
+    relative_phase: float | None = None
     phase_shift : float = 0
-    frequency : Optional[float] = None
+    frequency : float | None = None
 
 
 @dataclass
@@ -44,6 +46,7 @@ def _phase2float(phase_uint32):
     # print(f'Phase {phase:9.6f} rotations ({phase*360:8.3f} deg)')
     return phase
 
+
 def _freq2Hz(freq_uint32):
     # freq in Hz
     # convert uint to int if value > 2**31
@@ -55,14 +58,17 @@ def _freq2Hz(freq_uint32):
     # print(f'Frequency {freq/1e6:9.6f} MHz')
     return freq
 
+
 def float2int16array(value):
     # TODO: check on float < -1.0 or > +1.0
     # Scale to 16 bit value, but store in 32 bit to avoid
     # overflow on later operations.
     return np.array(value*2**15, dtype=np.int32)
 
+
 def _i16(value):
     return np.int16(value)
+
 
 def check_conditional(func):
     @wraps(func)
@@ -90,6 +96,7 @@ class Renderer:
         self.mixer_gain_ratio = 1.0
         self.mixer_phase_offset_degree = 0.0
         self.delete_acquisition_data_all()
+        self.next_settings = Settings()
         self.reset()
         self.trace_enabled = False
         self.skip_wait_sync = True
@@ -99,8 +106,8 @@ class Renderer:
         self.acq_conf = AcqConf()
 
     def reset(self):
-        self.settings = Settings()
-        self.next_settings = Settings()
+        # start with the old settings / values set via qcodes.
+        self.settings = copy(self.next_settings)
         self.time = 0
         # Qblox sequencer has 3 different phase registers
         self.nco_phase_offset = 0.0
@@ -119,9 +126,21 @@ class Renderer:
         self.errors = set()
         self.latch_enabled = False
         self.latch_regs = np.zeros(15, dtype=np.uint16)
-        self.trigger_events: List[TriggerEvent] = []
+        self.trigger_events: list[TriggerEvent] = []
         self.skip_rt = False
         self.else_wait = 0
+
+    def gain_awg_path(self, gain, path):
+        if path == 0:
+            self.next_settings.awg_gain0 = gain
+        else:
+            self.next_settings.awg_gain1 = gain
+
+    def offset_awg_path(self, offset, path):
+        if path == 0:
+            self.next_settings.awg_offs0 = offset
+        else:
+            self.next_settings.awg_offs1 = offset
 
     def connect_out(self, out, value):
         self.output_selected_path[out] = value
