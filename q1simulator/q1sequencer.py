@@ -93,23 +93,12 @@ class Q1Sequencer(InstrumentChannel):
         self.add_parameter('mixer_corr_gain_ratio', set_cmd=self._set_mixer_gain_ratio)
         self.add_parameter('mixer_corr_phase_offset_degree', set_cmd=self._set_mixer_phase_offset_degree)
 
-        if qblox_version < Version('0.11'):
-            self.add_parameter('channel_map_path0_out0_en',
-                               set_cmd=partial(self._set_channel_map_path_en, 0, 0))
-            self.add_parameter('channel_map_path1_out1_en',
-                               set_cmd=partial(self._set_channel_map_path_en, 1, 1))
-            if self._is_qcm:
-                self.add_parameter('channel_map_path0_out2_en',
-                                   set_cmd=partial(self._set_channel_map_path_en, 0, 2))
-                self.add_parameter('channel_map_path1_out3_en',
-                                   set_cmd=partial(self._set_channel_map_path_en, 1, 3))
-        else:
-            n_out_ch = 4 if self._is_qcm else 2
-            if self._is_rf:
-                n_out_ch //= 2
-            for i in range(n_out_ch):
-                self.add_parameter(f'connect_out{i}',
-                                   set_cmd=partial(self._connect_out, i))
+        n_out_ch = 4 if self._is_qcm else 2
+        if self._is_rf:
+            n_out_ch //= 2
+        for i in range(n_out_ch):
+            self.add_parameter(f'connect_out{i}',
+                               set_cmd=partial(self._connect_out, i))
 
         for i in range(1,16):
             self.add_parameter(f'trigger{i}_count_threshold',

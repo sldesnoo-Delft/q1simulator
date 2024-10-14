@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.14.1] - -----
+
+- Dropped support for qblox-instruments < v0.11
+
 ## \[0.14.0] - 2024-10-14
 
 - Added compatibility with qblox-instruments v0.14.1

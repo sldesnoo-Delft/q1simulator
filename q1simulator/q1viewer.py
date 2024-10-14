@@ -66,10 +66,7 @@ def plot_q1asm_files(plot_defs,
 
         for ch in plot.out:
             path = ch % 2
-            if qblox_version < Version('0.11'):
-                sequencer.set(f'channel_map_path{path}_out{ch}_en', True)
-            else:
-                sequencer.set(f'connect_out{ch}', 'I' if path == 0 else 'Q')
+            sequencer.set(f'connect_out{ch}', 'I' if path == 0 else 'Q')
 
         sequencer.set('sequence', plot.filename)
         sequencer.sync_en(True)
