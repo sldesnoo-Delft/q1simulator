@@ -42,6 +42,7 @@ class Q1Sequencer(InstrumentChannel):
         'cont_mode_waveform_idx_awg_path1',
         'upsample_rate_awg_path0',
         'upsample_rate_awg_path1',
+        'nco_freq_cal_type_default',
         ]
     _seq_log_only_parameters_qrm = [
         'connect_acq_I',
@@ -360,6 +361,9 @@ class Q1Sequencer(InstrumentChannel):
     def reset_trigger_thresholding(self) -> None:
         for i in range(1, 16):
             self.set_trigger_thresholding(i, 1, False)
+
+    def sideband_cal(self) -> None:
+        logger.info(f"Calibrate sideband {self.name}")
 
     def arm(self):
         self.run_state = 'ARMED'

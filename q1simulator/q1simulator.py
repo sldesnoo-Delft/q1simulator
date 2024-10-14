@@ -57,6 +57,8 @@ class Q1Module(qc.instrument.InstrumentBase):
         'out0_offset_path1',
         'out1_offset_path0',
         'out1_offset_path1',
+        'out0_lo_freq_cal_type_default',
+        'out1_lo_freq_cal_type_default',
         ]
     _sim_parameters_qrm = [
         'out0_offset',
@@ -89,7 +91,9 @@ class Q1Module(qc.instrument.InstrumentBase):
         'scope_acq_sequencer_select',
         'scope_acq_avg_mode_en_path0',
         'scope_acq_avg_mode_en_path1',
+        'out0_in0_lo_freq_cal_type_default',
         ]
+
 
     # NOTE: No __init__() !!!
     # This class is used as a mixin. Although quite heavy mixin.
@@ -119,6 +123,30 @@ class Q1Module(qc.instrument.InstrumentBase):
         elif sim_type == 'Viewer':
             sim_params += list(set(self._sim_parameters_qcm+self._sim_parameters_qrm))
 
+        n_out_ch_type = {
+            'QCM': 4,
+            'QRM': 2,
+            'QCM-RF': 2,
+            'QRM-RF': 1,
+            'Viewer': 0,
+            }
+        for ch in range(n_out_ch_type[sim_type]):
+            sim_params += [
+                f'out{ch}_latency',
+                f'out{ch}_fir_config',
+                f'out{ch}_fir_coeffs',
+                ]
+            sim_params += [f'out{ch}_exp{i}_config' for i in range(4)]
+            if sim_type == 'QCM':
+                sim_params += [f'out{ch}_exp{i}_time_constant' for i in range(4)]
+                sim_params += [f'out{ch}_exp{i}_amplitude' for i in range(4)]
+
+        for ch in range(4):
+            sim_params += [
+                f'marker{ch}_fir_config',
+                ]
+            sim_params += [f'marker{ch}_exp{i}_config' for i in range(4)]
+
         for par_name in sim_params:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
 
@@ -126,6 +154,12 @@ class Q1Module(qc.instrument.InstrumentBase):
                            for i in range(n_sequencers)]
         for i, seq in enumerate(self.sequencers):
             self.add_submodule(f'sequencer{i}', seq)
+
+        if sim_type == 'QCM-RF':
+            self.out0_lo_cal = lambda: logger.info("Calibrate LO 0")
+            self.out1_lo_cal = lambda: logger.info("Calibrate LO 1")
+        if sim_type == 'QRM-RF':
+            self.out0_in0_lo_cal = lambda: logger.info("Calibrate LO 0")
 
         self.armed_seq = set()
         if self._is_qrm:
