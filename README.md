@@ -1,6 +1,6 @@
 # Q1Simulator
 Simulator to execute Q1ASM and render the output channels.
-The simulator can be used like a `Pulsar` or `Cluster` object
+The simulator can be used like a `Cluster` object or a single module
 of `qblox_instruments`, where the Cluster can contain
 QCM, QRM, QCM-RF and QRM-RF modules.
 The simulator can be used with other Python software to test the
@@ -26,11 +26,14 @@ uses buffer between Q1Core and real-time executor. It aborts execution
 when the real-time buffer would have an underrun.
 The renderer uses the uploaded waveforms and the nco frequency.
 
+Note: Currently all qcodes parameters of the simulator initialize to None.
+The parameters must explicitly be set.
+
 # Example
 
-    from q1simulator import Q1Simulator as Pulsar
+    from q1simulator import Q1Simulator as Module
 
-    sim = Pulsar('q1sim', sim_type='QCM')
+    sim = Module('q1sim', sim_type='QCM')
     sim.sequencer0.sequence('my_sequence.json')
     sim.arm_sequencer(0)
     sim.start_sequencer()
@@ -59,16 +62,15 @@ specified in a dictionary with  slot number and module type.
 
 # Q1Plotter
 
-Q1Plotter retrieves the settings from a cluster and runs a simulation of 
+Q1Plotter retrieves the settings from a cluster and runs a simulation of
 the program to plot the expected outputs.
 
     from q1simulator import Q1Plotter
- 
+
     plotter = Q1Plotter(my_cluster)
     plotter.plot()
 
-
-
+**NOTE: Only sequencers with `sync_en()==True` are copy to the simulator and plotted. **
 
 # Q1ASM file viewer
 `plot_q1asm_file` is a simple function that reads a file
@@ -93,7 +95,6 @@ See demo directory for some examples.
 
 The viewer can be executed from the commandline to view a single sequence file:
 `python -m q1simulator.q1viewer q1simulator\demo\demo_data\q1seq_P1.json`
-
 
 # Simulator rendering limits
 The maximum length of the rendered output is limited to 2 ms,
@@ -127,7 +128,9 @@ the simulator and mimic behavior of the cluster / module / sequencer:
 - get_acquisitions
 - delete_acquisition_data
 
-Simulated sequencer parameters:
+Simulated sequencer qcodes parameters:
+- gain_awg_pathX
+- offset_awg_pathX
 - nco_freq
 - mod_en_awg
 - demod_en_acq
@@ -135,10 +138,7 @@ Simulated sequencer parameters:
 - channel_map_path1_out1_en ( < v0.11)
 - channel_map_path0_out2_en ( < v0.11)
 - channel_map_path1_out3_en ( < v0.11)
-- connect_out0 (v0.11+)
-- connect_out1 (v0.11+)
-- connect_out2 (v0.11+)
-- connect_out3 (v0.11+)
+- connect_outX (v0.11+)
 - sequence
 - mixer_corr_gain_ratio
 - mixer_corr_phase_offset_degree
@@ -211,7 +211,7 @@ check whether triggers overlap.
 The configuration setting `acq_trigger_value` allows to evaluate the sequence
 for a specified trigger value. `sim.config('acq_trigger_value', 1)` sends a trigger
 after every acquisition. `sim.config('acq_trigger_value', 0)` sends no triggers.
-If `acq_trigger_value` is None then the simulator uses the threshold on the 
+If `acq_trigger_value` is None then the simulator uses the threshold on the
 acquisition data.
 
 # Simulator output

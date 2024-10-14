@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.14.0] - 2024-10-14
+
+- Added compatibility with qblox-instruments v0.14.1
+- Added Real-Time Pre-Distortion (RTP) API-only
+- Added Automatic Mixer Calibration (AMC) API-only
+- Fixed output amplitude when NCO is enabled.
+- Require Python >= 3.10
+
 ## \[0.13.1] - 2024-10-10
 
 - Fixed Cluster.reset()

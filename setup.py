@@ -8,7 +8,7 @@ setup(name="q1simulator",
     description="Simulator for Q1ASM",
     author="Sander de Snoo",
 	packages = find_packages(),
-    python_requires=">=3.7",
+    python_requires=">=3.10",
 	install_requires=[
         'qcodes',
         'qblox_instruments',
