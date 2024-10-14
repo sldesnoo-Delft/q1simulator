@@ -437,12 +437,14 @@ class Renderer:
             if self.nco_frequency < 0:
                 phase_offset = -phase_offset
             phase = 2*np.pi*(phase_offset + self.nco_phase_offset + self.nco_frequency * 1e-9 * t)
-            lo = np.cos(phase) + 1j*np.sin(phase)
-            data0 = lo.real*path0 - lo.imag*path1
+            nco = np.cos(phase) + 1j*np.sin(phase)
+            # Multiplication factor as specified when modulating.
+            nco *= np.sqrt(.5)
+            data0 = nco.real*path0 - nco.imag*path1
             if self.mixer_phase_offset_degree != 0.0:
                 phase_offset = self.mixer_phase_offset_degree/180*np.pi
-                lo *= np.cos(phase_offset) + 1j*np.sin(phase_offset)
-            data1 = lo.imag*path0 + lo.real*path1
+                nco *= np.cos(phase_offset) + 1j*np.sin(phase_offset)
+            data1 = nco.imag*path0 + nco.real*path1
             if self.mixer_gain_ratio > 1.0:
                 data0 *= 1/self.mixer_gain_ratio
             if self.mixer_gain_ratio < 1.0:
