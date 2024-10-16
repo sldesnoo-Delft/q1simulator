@@ -12,5 +12,6 @@ setup(name="q1simulator",
 	install_requires=[
         'qcodes',
         'qblox_instruments',
+        'numpy',
       ],
 	)

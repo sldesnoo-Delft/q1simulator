@@ -2,6 +2,8 @@ from collections import deque
 import time
 import logging
 
+import numpy as np
+
 from .q1parser import Q1Parser
 
 logger = logging.getLogger(__name__)
@@ -23,7 +25,7 @@ class Q1Core:
         self._is_qrm = is_qrm
         self.max_core_cycles= 10_000_000
         self.skip_loops = ("_start", )
-        self.R = [0]*64
+        self.R = np.zeros(64, dtype=np.uint32)
         self.lines = []
         self.instructions = []
         self.iptr = 0
@@ -33,14 +35,14 @@ class Q1Core:
         parser = Q1Parser()
         self.lines, self.instructions = parser.parse(program)
 
-    def get_used_triggers(self):
+    def get_used_triggers(self) -> int:
         '''
         Returns int with OR of all used condition masks
         '''
         res = 0
         for instr in self.instructions:
             if instr.mnemonic == 'set_cond':
-                mask = instr.args[1]
+                mask = int(instr.args[1])
                 if instr.reg_args and 1 in instr.reg_args:
                     # Trigger addresses are determined at run time.
                     logger.info('Condition mask is register.')
@@ -50,7 +52,7 @@ class Q1Core:
 
     def run(self):
         self.errors = set()
-        self.R = [0]*64
+        self.R = np.zeros(64, dtype=np.uint32)
         self.iptr = 0
         self.clock = CoreClock()
         # give the core a head start of 10 cycles
@@ -71,6 +73,7 @@ class Q1Core:
                 return
 
         start = time.perf_counter()
+        orig_err_settings = np.seterr(over='ignore')
         try:
             cntr = 0
             while(True):
@@ -105,6 +108,8 @@ class Q1Core:
             self._print_error_msg('Exception', instr, cntr)
             self._error('OOPS!!')
             raise
+        finally:
+            np.seterr(**orig_err_settings)
 
         duration = time.perf_counter() - start
         logger.info(f'Duration {duration*1000:5.1f} ms {cntr} instructions, {duration/cntr*1e6:4.1f} us/instr')
@@ -120,7 +125,7 @@ class Q1Core:
         self.errors.add(msg)
 
     def _set_register(self, reg_nr, value):
-        self.R[reg_nr] = value & 0xFFFF_FFFF
+        self.R[reg_nr] = value
         # print(f'R{reg_nr} = {np.int32(np.uint32(self.R[reg_nr]))} ({self.R[reg_nr]:08X})')
 
     def print_registers(self, reg_nrs=None):
@@ -128,7 +133,7 @@ class Q1Core:
             reg_nrs = range(64)
         for reg_nr in reg_nrs:
             value = self.R[reg_nr]
-            signed_value = ((value + 0x8000_0000) & 0xFFFF_FFFF) - 0x8000_0000
+            signed_value =  np.asarray(value).astype(np.int32)
             float_value = signed_value / 2**31
             print(f'R{reg_nr:02}: {value:08X} {signed_value:11}  ({float_value:9.6f})')
 
@@ -237,10 +242,12 @@ class Q1Core:
         self.renderer.set_ph_delta(phase_delta)
 
     def _set_awg_gain(self, gain0, gain1):
-        self.renderer.set_awg_gain(gain0, gain1)
+        # cast for unsigned register values
+        self.renderer.set_awg_gain(np.int16(gain0), np.int16(gain1))
 
     def _set_awg_offs(self, offset0, offset1):
-        self.renderer.set_awg_offs(offset0, offset1)
+        # cast for unsigned register values
+        self.renderer.set_awg_offs(np.int16(offset0), np.int16(offset1))
 
     def _set_cond(self, enable, mask, op, else_wait):
         self.renderer.set_cond(enable, mask, op, else_wait)
@@ -287,16 +294,13 @@ class Q1Core:
     def _wait_trigger(self, wait_after):
         raise NotImplementedError()
 
-    def _sw_req(self, value):
-        raise NotImplementedError()
-
     # ---- Simulator commands ----
 
     def _log(self, msg, reg, options):
         if 'R' in options and reg.startswith('R'):
             reg_nr = int(reg[1:])
             value = self.R[reg_nr]
-            signed_value = ((value + 0x8000_0000) & 0xFFFF_FFFF) - 0x8000_0000
+            signed_value = np.asarray(value).astype(np.int32)
             float_value = signed_value / 2**31
             if 'F' in options:
                 value_str = f'{float_value:9.6f} ({value:08X})'
