@@ -1,9 +1,9 @@
 import sys
 from dataclasses import dataclass, field
 from packaging.version import Version
-from typing import List, Optional
 
 import matplotlib.pyplot as pt
+from qcodes import Instrument
 
 from .q1simulator import Q1Simulator
 from .qblox_version import qblox_version
@@ -12,9 +12,9 @@ from .qblox_version import qblox_version
 @dataclass
 class PlotDef:
     filename: str
-    sequencer_name: Optional[str] = None
-    out: List[int] = field(default_factory=lambda:[0,1])
-    lo_frequency: Optional[float] = None
+    sequencer_name: str | None = None
+    out: list[int] = field(default_factory=lambda:[0,1])
+    lo_frequency: float | None = None
 
 
 def plot_q1asm_file(filename,
@@ -46,7 +46,13 @@ def plot_q1asm_files(plot_defs,
                      t_min=None,
                      t_max=None,
                      ):
-    sim = Q1Simulator('sim', n_sequencers=len(plot_defs), sim_type='Viewer')
+
+    name = "Q1Viewer"
+    try:
+        Instrument.find_instrument("Q1Viewer").close()
+    except KeyError:
+        pass
+    sim = Q1Simulator('Q1Viewer', n_sequencers=len(plot_defs), sim_type='Viewer')
     sim.config('max_render_time', max_render_time)
     sim.config('max_core_cycles', max_core_cycles)
     sim.config('skip_loops', () if render_repetitions else ("_start", ))
@@ -59,16 +65,16 @@ def plot_q1asm_files(plot_defs,
 
         sequencer = getattr(sim, f'sequencer{i}')
         if plot.lo_frequency is None:
-            sequencer.set('mod_en_awg', False)
+            sequencer.mod_en_awg(False)
         else:
-            sequencer.set('mod_en_awg', True)
-            sequencer.set('nco_freq', plot.lo_frequency)
+            sequencer.mod_en_awg(True)
+            sequencer.nco_freq(plot.lo_frequency)
 
         for ch in plot.out:
             path = ch % 2
             sequencer.set(f'connect_out{ch}', 'I' if path == 0 else 'Q')
 
-        sequencer.set('sequence', plot.filename)
+        sequencer.sequence(plot.filename)
         sequencer.sync_en(True)
 
         sim.arm_sequencer(i)

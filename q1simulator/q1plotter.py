@@ -1,7 +1,6 @@
 import logging
 import os
 from packaging.version import Version
-from typing import List, Optional, Tuple, Union
 
 from qcodes import Instrument
 from qblox_instruments import Cluster
@@ -53,7 +52,7 @@ class Q1Plotter:
         self._simulator.config("max_core_cycles", self._max_core_cycles)
 
     @property
-    def skip_loops(self) -> Tuple[str, ...]:
+    def skip_loops(self) -> tuple[str, ...]:
         """Labels of loops to skip.
         Setting this to ("_start", ) will skip the repetitions of Q1Pulse sequences.
         """
@@ -77,7 +76,7 @@ class Q1Plotter:
         self._simulator.config('skip_wait_sync', self._skip_wait_sync)
 
     @property
-    def acq_trigger_value(self) -> Optional[int]:
+    def acq_trigger_value(self) -> int | None:
         """The value used for every acquisition trigger in the sequence.
         Allowed values: None, 0, 1.
 
@@ -136,11 +135,11 @@ class Q1Plotter:
         self._simulator.start_sequencer()
 
     def plot(self,
-             t_min: Optional[float] = None,
-             t_max: Optional[float] = None,
-             channels: Union[None, List[str], List[int]] = None,
-             modules: Optional[List[int]] = None,
-             create_figure: Union[bool, str] = True,
+             t_min: float | None = None,
+             t_max: float | None = None,
+             channels: list[str] | list[int] | None = None,
+             modules: list[int] | None = None,
+             create_figure: bool | str = True,
              ):
         """Plots the simulated output of the cluster.
 

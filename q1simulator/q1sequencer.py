@@ -3,7 +3,7 @@ from functools import partial
 from dataclasses import dataclass
 import json
 import numpy as np
-from typing import Optional, Iterator, Iterable, Tuple
+from typing import Iterator, Iterable
 
 from qcodes.instrument.channel import InstrumentChannel
 
@@ -341,7 +341,7 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer.set_trigger_count_threshold(address, count)
         self.rt_renderer.set_trigger_threshold_invert(address, invert)
 
-    def get_trigger_thresholding(self, address: int) -> Tuple[int,bool]:
+    def get_trigger_thresholding(self, address: int) -> tuple[int,bool]:
         return (
             self.rt_renderer.get_trigger_count_threshold(address),
             self.rt_renderer.get_trigger_threshold_invert(address)
@@ -400,7 +400,7 @@ class Q1Sequencer(InstrumentChannel):
     # --- Simulator specific methods ---
 
     def set_acquisition_mock_data(self,
-                                  data: Optional[Iterable[MockDataType]],
+                                  data: Iterable[MockDataType] | None,
                                   name='default',
                                   repeat=False):
         '''

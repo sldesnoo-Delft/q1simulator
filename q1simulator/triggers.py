@@ -1,7 +1,6 @@
 from copy import copy
 import math
 from dataclasses import dataclass
-from typing import List
 
 @dataclass
 class TriggerEvent:
@@ -30,7 +29,7 @@ class TriggerEvent:
 
 class TriggerDistributor:
     def __init__(self):
-        self.trigger_events: List[TriggerEvent] = []
+        self.trigger_events: list[TriggerEvent] = []
 
     def add_emitted_triggers(self, trigger_events):
         # Assumes there are no collisions on the trgigger network.
