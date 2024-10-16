@@ -1,6 +1,5 @@
 import logging
 from functools import partial
-from typing import Optional, List, Union
 
 import numpy as np
 import matplotlib.pyplot as pt
@@ -207,12 +206,12 @@ class Q1Module(qc.instrument.InstrumentBase):
         self.armed_seq.add(seq_nr)
         self.sequencers[seq_nr].arm()
 
-    def start_sequencer(self, sequencer: Optional[int] = None):
+    def start_sequencer(self, sequencer: int | None = None):
         start_indices = self.armed_seq if sequencer is None else (sequencer,)
         for seq_nr in start_indices:
             self.sequencers[seq_nr].run()
 
-    def stop_sequencer(self, sequencer: Optional[int] = None):
+    def stop_sequencer(self, sequencer: int | None = None):
         self.armed_seq = set()
 
     if qblox_version < Version('0.14'):
@@ -254,7 +253,7 @@ class Q1Module(qc.instrument.InstrumentBase):
     def plot(self,
              t_min: float = None,
              t_max: float = None,
-             channels: Union[None, List[str], List[int]] = None,
+             channels: list[str] | list[int] | None = None,
              **kwargs):
         for i, seq in enumerate(self.sequencers):
             if channels is not None and i not in channels and seq.label not in channels:
@@ -328,6 +327,10 @@ class Q1Simulator(qc.Instrument, Q1Module):
     def instrument_type(self):
         return InstrumentType[self._sim_type]
 
+    def reset(self):
+        self.invalidate_cache()
+        super().reset()
+
     if qblox_version >= Version('0.12'):
         def get_system_status(self):
             return SystemStatus(
@@ -348,7 +351,7 @@ class Q1Simulator(qc.Instrument, Q1Module):
                 [],
                 SystemStatusSlotFlags({}))
 
-    def start_sequencer(self, sequencer: Optional[int] = None):
+    def start_sequencer(self, sequencer: int | None = None):
         if sequencer is not None:
             self.sequencers[sequencer].run()
             return
@@ -365,7 +368,7 @@ class Q1Simulator(qc.Instrument, Q1Module):
     def plot(self,
              t_min: float = None,
              t_max: float = None,
-             channels: Union[None, List[str], List[int]] = None,
+             channels: list[str] | list[int] | None = None,
              **kwargs):
         pt.figure()
         super().plot(t_min=t_min, t_max=t_max, channels=channels)
@@ -376,7 +379,7 @@ class Q1Simulator(qc.Instrument, Q1Module):
         pt.show()
 
 
-def run_sequencers(sequencers: List[Q1Sequencer], ignore_triggers=False):
+def run_sequencers(sequencers: list[Q1Sequencer], ignore_triggers=False):
     if ignore_triggers:
         for seq in sequencers:
             seq.run()

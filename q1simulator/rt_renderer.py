@@ -1,6 +1,6 @@
 import logging
-from copy import copy
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import dataclass, field
 from typing import Sequence, Iterable
 from numbers import Number
 from collections.abc import Sequence as AbcSequence
@@ -20,10 +20,8 @@ MockDataEntry = float | complex | Sequence[float]
 @dataclass
 class Settings:
     marker : int = 0
-    awg_offs0 : int = 0
-    awg_offs1 : int = 0
-    awg_gain0 : int = 32767
-    awg_gain1 : int = 32767
+    awg_offs: np.ndarray = field(default_factory=lambda: np.zeros(2, np.int16))
+    awg_gain: np.ndarray = field(default_factory=lambda: np.full(2, 32767, np.int16))
     reset_phase : bool = False
     relative_phase: float | None = None
     phase_shift : float = 0
@@ -49,25 +47,20 @@ def _phase2float(phase_uint32):
 
 def _freq2Hz(freq_uint32):
     # freq in Hz
-    # convert uint to int if value > 2**31
-    if freq_uint32 > 2**31:
-        freq_int32 = freq_uint32 - 2**32
-    else:
-        freq_int32 = freq_uint32
-    freq = freq_int32/4
-    # print(f'Frequency {freq/1e6:9.6f} MHz')
-    return freq
+    # convert uint to int32 if value > 2**31
+    res = np.int32(freq_uint32)
+    return res
 
 
 def float2int16array(value):
     # TODO: check on float < -1.0 or > +1.0
     # Scale to 16 bit value, but store in 32 bit to avoid
     # overflow on later operations.
-    return np.array(value*2**15, dtype=np.int32)
+    return np.array(value*2**15).astype(np.int32)
 
 
 def _i16(value):
-    return np.int16(value)
+    return np.int32(value).astype(np.int16)
 
 
 def check_conditional(func):
@@ -101,13 +94,13 @@ class Renderer:
         self.trace_enabled = False
         self.skip_wait_sync = True
         self.acq_trigger_value = None
-        self.threshold_count = np.full(15, 2^16-1, dtype=np.uint16)
+        self.threshold_count = np.full(15, 0, dtype=np.uint16)
         self.threshold_invert = np.zeros(15, dtype=bool)
         self.acq_conf = AcqConf()
 
     def reset(self):
         # start with the old settings / values set via qcodes.
-        self.settings = copy(self.next_settings)
+        self.settings = deepcopy(self.next_settings)
         self.time = 0
         # Qblox sequencer has 3 different phase registers
         self.nco_phase_offset = 0.0
@@ -131,16 +124,10 @@ class Renderer:
         self.else_wait = 0
 
     def gain_awg_path(self, gain, path):
-        if path == 0:
-            self.next_settings.awg_gain0 = gain
-        else:
-            self.next_settings.awg_gain1 = gain
+        self.next_settings.awg_gain[path] = gain
 
     def offset_awg_path(self, offset, path):
-        if path == 0:
-            self.next_settings.awg_offs0 = offset
-        else:
-            self.next_settings.awg_offs1 = offset
+        self.next_settings.awg_offs[path] = offset
 
     def connect_out(self, out, value):
         self.output_selected_path[out] = value
@@ -205,12 +192,10 @@ class Renderer:
         self.next_settings.phase_shift = _phase2float(phase_delta)
 
     def set_awg_gain(self, gain0, gain1):
-        self.next_settings.awg_gain0 = gain0
-        self.next_settings.awg_gain1 = gain1
+        self.next_settings.awg_gain[:] = gain0, gain1
 
     def set_awg_offs(self, offset0, offset1):
-        self.next_settings.awg_offs0 = offset0
-        self.next_settings.awg_offs1 = offset1
+        self.next_settings.awg_offs[:] = offset0, offset1
 
     @check_conditional
     def upd_param(self, wait_after):
@@ -343,10 +328,10 @@ class Renderer:
 
         if self.trace_enabled:
             msg = []
-            if new.awg_gain0 != old.awg_gain0 or new.awg_gain1 != old.awg_gain1:
-                msg.append(f'awg_gain {new.awg_gain0},{new.awg_gain1}')
-            if new.awg_offs0 != old.awg_offs0 or new.awg_offs1 != old.awg_offs1:
-                msg.append(f'awg_offset {new.awg_offs0},{new.awg_offs1}')
+            if not np.array_equal(new.awg_gain, old.awg_gain):
+                msg.append(f'awg_gain {new.awg_gain}')
+            if not np.array_equal(new.awg_offs, old.awg_offs):
+                msg.append(f'awg_offset {new.awg_offs}')
             if new.reset_phase:
                 msg.append('reset_phase')
             if new.relative_phase is not None:
@@ -378,7 +363,7 @@ class Renderer:
         if new.marker != old.marker:
             self._render_marker(old.marker, new.marker)
         # copy marker, offset and gain
-        self.settings = copy(self.next_settings)
+        self.settings = deepcopy(self.next_settings)
 
     def _render_marker(self, old_marker, new_marker):
         for i in range(4):
@@ -419,17 +404,14 @@ class Renderer:
 
         s = self.settings
 
-        path0 = np.full(t_render, s.awg_offs0, dtype=np.int16)
-        path1 = np.full(t_render, s.awg_offs1, dtype=np.int16)
+        path = np.zeros((2, t_render), dtype=np.int16)
+        path = s.awg_offs
 
-        if self.waves_end[0] > t_start:
-            end = min(self.waves_end[0], t_end)
-            data = self.waves[0][t_start-self.wave_start:end-self.wave_start]
-            path0[0:len(data)] += (int(_i16(s.awg_gain0)) * data // 2**15)
-        if self.waves_end[1] > t_start:
-            end = min(self.waves_end[1], t_end)
-            data = self.waves[1][t_start-self.wave_start:end-self.wave_start]
-            path1[0:len(data)] += (int(_i16(s.awg_gain1)) * data // 2**15)
+        for i in range(2):
+            if self.waves_end[0] > t_start:
+                end = min(self.waves_end[i], t_end)
+                data = self.waves[i][t_start-self.wave_start:end-self.wave_start]
+                path[i][0:len(data)] += (s.awg_gain[i] * data) >> 15
 
         if self.mod_en_awg:
             t = np.arange(t_start, t_end)
@@ -437,14 +419,14 @@ class Renderer:
             if self.nco_frequency < 0:
                 phase_offset = -phase_offset
             phase = 2*np.pi*(phase_offset + self.nco_phase_offset + self.nco_frequency * 1e-9 * t)
-            nco = np.cos(phase) + 1j*np.sin(phase)
+            nco = np.exp(1j*phase)
             # Multiplication factor as specified when modulating.
             nco *= np.sqrt(.5)
-            data0 = nco.real*path0 - nco.imag*path1
+            data0 = nco.real*path[0] - nco.imag*path[1]
             if self.mixer_phase_offset_degree != 0.0:
                 phase_offset = self.mixer_phase_offset_degree/180*np.pi
-                nco *= np.cos(phase_offset) + 1j*np.sin(phase_offset)
-            data1 = nco.imag*path0 + nco.real*path1
+                nco *= np.exp(1j*phase_offset)
+            data1 = nco.imag*path[0] + nco.real*path[1]
             if self.mixer_gain_ratio > 1.0:
                 data0 *= 1/self.mixer_gain_ratio
             if self.mixer_gain_ratio < 1.0:
@@ -452,8 +434,8 @@ class Renderer:
             data0 = data0.astype(np.int16)
             data1 = data1.astype(np.int16)
         else:
-            data0 = path0
-            data1 = path1
+            data0 = path[0]
+            data1 = path[1]
 
         self.out0.append(data0)
         self.out1.append(data1)

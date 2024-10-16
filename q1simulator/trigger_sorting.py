@@ -1,5 +1,4 @@
 import logging
-from typing import List
 from dataclasses import dataclass
 
 from .q1sequencer import Q1Sequencer
@@ -30,13 +29,13 @@ def get_seq_trigger_info(sequencer):
             sequencer.get_used_triggers()
             )
 
-def get_emitted_triggers(sequencers: List[SequencerTriggerInfo]):
+def get_emitted_triggers(sequencers: list[SequencerTriggerInfo]):
     emitted = 0
     for seq in sequencers:
         emitted |= seq.emitted_triggers
     return emitted
 
-def sort_sequencers(sequencers: List[SequencerTriggerInfo]):
+def sort_sequencers(sequencers: list[SequencerTriggerInfo]):
     ''' Sorts sequencers putting trigger producers before trigger consumers.
 
     Sequencers are executed sequentially. A sequencer must be executed after

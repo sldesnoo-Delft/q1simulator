@@ -44,9 +44,9 @@ class TestCluster:
         self.armed = []
         for module in [self.qcm, self.qrm]:
             seq = module.sequencers[0]
-            seq.channel_map_path0_out0_en(True)
+            seq.connect_out0("I")
             seq = module.sequencers[1]
-            seq.channel_map_path1_out1_en(True)
+            seq.connect_out1("Q")
         for num in [0,1]:
             seq = self.qrm.sequencers[num]
             seq.thresholded_acq_trigger_en(False)
@@ -93,7 +93,7 @@ class TestCluster:
             self.qcm.plot()
 
 
-sim = TestCluster(sim=False)
+sim = TestCluster(sim=True)
 waveforms = generate_waveforms()
 acquisitions = {
         "acq0": {"num_bins": 1, "index": 0},

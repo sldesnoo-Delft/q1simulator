@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.14.2] - 2024-10-16
+
+- Dropped support for qblox-instruments < v0.11
+- Support Numpy 2.0+
+- Invalidate parameter cache on reset()
+
+## \[0.14.1] -- failed -- 
+
 ## \[0.14.0] - 2024-10-14
 
 - Added compatibility with qblox-instruments v0.14.1

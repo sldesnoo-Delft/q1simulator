@@ -1,60 +1,61 @@
 import re
-
 from dataclasses import dataclass
-from typing import Optional, Tuple, Any, List, Union
+
+import numpy as np
+
 
 @dataclass
 class Instruction:
     text_line_nr: int
     mnemonic: str
-    arglist: Optional[Tuple[str]] = None
-    label: Optional[str] = None
-    args: List[Union[int,str]] = None
-    reg_args: List[int] = None
-    func_name: Optional[str] = None
-    func: Any = None
+    arglist: tuple[str] | None = None
+    label: str | None = None
+    args: list[int | str] | None = None
+    reg_args: list[int] | None = None
+    func_name: str | None = None
+    func: any = None
     clock_ticks: int = 1
 
 
 class AsmSyntaxError(Exception):
     pass
 
-# I = immediate, R = register, L = label, D = destination register
+
+# S = immediate signed, U = immediate unsigned, R = register, L = label, D = destination register
 mnemonic_args = {
     'illegal': '',
     'stop': '',
     'nop': '',
-    'jmp': 'IRL',
-    'jlt': 'R,I,IRL',
-    'jge': 'R,I,IRL',
-    'loop': 'D,IRL',
-    'move': 'IRL,D',
-    'not': 'IR,D',
-    'add': 'R,IR,D',
-    'sub': 'R,IR,D',
-    'and': 'R,IR,D',
-    'or': 'R,IR,D',
-    'xor': 'R,IR,D',
-    'asl': 'R,IR,D',
-    'asr': 'R,IR,D',
-    'set_mrk': 'IR',
+    'jmp': 'URL',
+    'jlt': 'R,U,URL',
+    'jge': 'R,U,URL',
+    'loop': 'D,URL',
+    'move': 'URL,D',
+    'not': 'UR,D',
+    'add': 'R,UR,D',
+    'sub': 'R,UR,D',
+    'and': 'R,UR,D',
+    'or': 'R,UR,D',
+    'xor': 'R,UR,D',
+    'asl': 'R,UR,D',
+    'asr': 'R,UR,D',
+    'set_mrk': 'UR',
     'reset_ph': '',
-    'set_freq': 'IR',
-    'set_ph': 'IR',
-    'set_ph_delta': 'IR',
-    'set_awg_gain': 'IR,IR',
-    'set_awg_offs': 'IR,IR',
-    'set_cond': 'IR,IR,IR,I',
-    'upd_param': 'I',
-    'play': 'IR,IR,I',
-    'acquire': 'I,IR,I',
-    'acquire_weighed': 'I,IR,IR,IR,I',
-    'set_latch_en': 'IR,I',
-    'latch_rst': 'IR',
-    'wait': 'IR',
-    'wait_sync': 'IR',
-    'wait_trigger': 'IR',
-    'sw_req': 'IR',
+    'set_freq': 'SR',
+    'set_ph': 'UR',
+    'set_ph_delta': 'UR',
+    'set_awg_gain': 'SR,SR',
+    'set_awg_offs': 'SR,SR',
+    'set_cond': 'UR,UR,UR,U',
+    'upd_param': 'U',
+    'play': 'UR,UR,U',
+    'acquire': 'U,UR,U',
+    'acquire_weighed': 'U,UR,UR,UR,U',
+    'set_latch_en': 'UR,U',
+    'latch_rst': 'UR',
+    'wait': 'UR',
+    'wait_sync': 'UR',
+    'wait_trigger': 'UR',
     }
 
 
@@ -69,7 +70,7 @@ class Q1Parser:
         self.lines = lines
 
         instructions = []
-        for i,line in enumerate(lines):
+        for i, line in enumerate(lines):
             label, mnemonic, arglist = self._parseline(line)
             if label:
                 icnt = len(instructions)
@@ -87,7 +88,7 @@ class Q1Parser:
             instr.func_name = func_name
             if mnemonic in mnemonic_args:
                 try:
-                    args,reg_args = self._evaluate_args(mnemonic_args[mnemonic], instr.arglist)
+                    args, reg_args = self._evaluate_args(mnemonic_args[mnemonic], instr.arglist)
                     instr.args = args
                     instr.reg_args = reg_args
                     if reg_args and mnemonic not in ['jmp', 'jge', 'jlt', 'loop']:
@@ -100,10 +101,14 @@ class Q1Parser:
                     print(ex)
                     print(lines[instr.text_line_nr])
                     raise
+                except Exception as ex:
+                    print(ex)
+                    print(lines[instr.text_line_nr])
+                    raise
             else:
                 instr.args = instr.arglist
 
-        return lines,instructions
+        return lines, instructions
 
     def _parseline(self, line):
         org_line = line
@@ -168,7 +173,7 @@ class Q1Parser:
         select_imm = False
         allow_imm = True
         reg_args = []
-        for i,arg in enumerate(args):
+        for i, arg in enumerate(args):
             allowed = types[i]
             c = arg[0]
             if allowed == 'D':
@@ -189,21 +194,24 @@ class Q1Parser:
             elif c == 'R':
                 if 'R' not in allowed:
                     raise AsmSyntaxError(f'Register operand not support as argument {i}')
-                if 'I' in allowed:
+                if 'U' in allowed or 'S' in allowed:
                     allow_imm = False
                 reg_nr = int(arg[1:])
                 args[i] = reg_nr
                 reg_args.append(i)
             else:
-                if 'I' not in allowed:
-                    raise AsmSyntaxError(f'Immediate operand not support as argument {i}')
                 if 'R' in allowed:
                     select_imm = True
-                args[i] = int(arg)
+                if 'U' in allowed:
+                    args[i] = np.uint32(arg)
+                elif 'S' in allowed:
+                    args[i] = np.int32(arg)
+                else:
+                    raise AsmSyntaxError(f'Immediate operand not support as argument {i}')
 
         if not allow_imm and select_imm:
             raise AsmSyntaxError('Combination of operands not supported')
 
         if len(reg_args) == 0:
             reg_args = None
-        return args,reg_args
+        return args, reg_args
