@@ -405,7 +405,8 @@ class Renderer:
         s = self.settings
 
         path = np.zeros((2, t_render), dtype=np.int16)
-        path = s.awg_offs
+        path[0] = s.awg_offs[0]
+        path[1] = s.awg_offs[1]
 
         for i in range(2):
             if self.waves_end[0] > t_start:
