@@ -1,5 +1,4 @@
 import logging
-from typing import Optional, Union, List
 from functools import partial
 
 import matplotlib.pyplot as pt
@@ -148,7 +147,7 @@ class Cluster(qc.Instrument):
         def get_acquisition_status(self, slot, seq_nr, timeout=0):
             return self.self._modules[slot].get_acquisition_status(seq_nr, timeout)
 
-    def arm_sequencer(self, slot: Optional[int] = None, sequencer: Optional[int] = None) -> None:
+    def arm_sequencer(self, slot: int | None = None, sequencer: int | None = None) -> None:
         if slot is not None:
             self._check_module_present(slot)
             self._modules[slot].arm_sequencer(sequencer)
@@ -156,7 +155,7 @@ class Cluster(qc.Instrument):
             for module in self.get_connected_modules().values():
                 module.arm_sequencer(sequencer)
 
-    def start_sequencer(self, slot: Optional[int] = None, sequencer: Optional[int] = None) -> None:
+    def start_sequencer(self, slot: int | None = None, sequencer: int | None = None) -> None:
         if slot is not None:
             self._check_module_present(slot)
             modules = [self._modules[slot]]
@@ -173,7 +172,7 @@ class Cluster(qc.Instrument):
 
         run_sequencers(sequencers)
 
-    def stop_sequencer(self, slot: Optional[int] = None, sequencer: Optional[int] = None) -> None:
+    def stop_sequencer(self, slot: int | None = None, sequencer: int | None = None) -> None:
         if slot is not None:
             self._check_module_present(slot)
             self._modules[slot].stop_sequencer(sequencer)
@@ -186,6 +185,7 @@ class Cluster(qc.Instrument):
         return list(self.submodules.values())
 
     def reset(self):
+        self.invalidate_cache()
         for module in self.get_connected_modules().values():
             module.reset()
 
@@ -200,11 +200,11 @@ class Cluster(qc.Instrument):
         return max(module.get_simulation_end_time() for module in self.get_connected_modules().values())
 
     def plot(self,
-             t_min: Optional[float] = None,
-             t_max: Optional[float] = None,
-             channels: Union[None, List[str], List[int]] = None,
-             modules: Optional[List[int]] = None,
-             create_figure: Union[bool, str] = True,
+             t_min: float | None = None,
+             t_max: float | None = None,
+             channels: list[str] | list[int] | None = None,
+             modules: list[int] | None = None,
+             create_figure: bool | str = True,
              **kwargs):
         """Plots the simulated output of the cluster.
 
