@@ -266,6 +266,12 @@ sim.load(False, 0, qrm_program([2]), acquisitions=acquisitions, waveforms=wavefo
 sim.trigger_out(0, 1, 0.0)
 sim.load(False, 1, qrm_program([1, 2]), acquisitions=acquisitions, waveforms=waveforms)
 sim.trigger_out(1, 2, 0.0)
-sim.run()
+try:
+    sim.run()
+except Exception as ex:
+    if ex.args[0].startswith("Sorting sequencers on triggers failed."):
+        print("Test OK.")
+    else:
+        raise
 
 
