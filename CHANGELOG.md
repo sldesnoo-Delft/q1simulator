@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.14.4] - 2024-10-18
+
+- Update to qcodes 0.49
+- Improved parse exceptions
+
 ## \[0.14.3] - 2024-10-16
 
 - Fixed bug in rendering
