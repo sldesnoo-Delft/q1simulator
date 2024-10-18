@@ -18,7 +18,9 @@ class Instruction:
 
 
 class AsmSyntaxError(Exception):
-    pass
+    def __str__(self):
+        # lines = [f"{self.__class__.__name__}:"] + list(self.args)
+        return "\n\t" + "\n\t".join(self.args)
 
 
 # S = immediate signed, U = immediate unsigned, R = register, L = label, D = destination register
@@ -100,10 +102,12 @@ class Q1Parser:
                 except AsmSyntaxError as ex:
                     print(ex)
                     print(lines[instr.text_line_nr])
+                    ex.args = ex.args + (f"line {instr.text_line_nr}: {lines[instr.text_line_nr]}", )
                     raise
                 except Exception as ex:
                     print(ex)
                     print(lines[instr.text_line_nr])
+                    ex.args = ex.args + (f"line {instr.text_line_nr}: {lines[instr.text_line_nr]}", )
                     raise
             else:
                 instr.args = instr.arglist
@@ -179,33 +183,27 @@ class Q1Parser:
             if allowed == 'D':
                 if c != 'R':
                     raise AsmSyntaxError('Destination must be register')
-                reg_nr = int(arg[1:])
-                args[i] = reg_nr
+                args[i] = self._parse_reg_arg(arg)
             elif c == '@':
                 if 'L' not in allowed:
                     raise AsmSyntaxError(f'Label operand not support as argument {i}')
                 if 'R' in allowed:
                     select_imm = True
-                try:
-                    line_nr = self.labels[arg[1:]]
-                    args[i] = line_nr
-                except:
-                    raise AsmSyntaxError(f'Label {arg} not defined')
+                args[i] = self._parse_label_arg(arg)
             elif c == 'R':
                 if 'R' not in allowed:
                     raise AsmSyntaxError(f'Register operand not support as argument {i}')
                 if 'U' in allowed or 'S' in allowed:
                     allow_imm = False
-                reg_nr = int(arg[1:])
-                args[i] = reg_nr
+                args[i] = self._parse_reg_arg(arg)
                 reg_args.append(i)
             else:
                 if 'R' in allowed:
                     select_imm = True
                 if 'U' in allowed:
-                    args[i] = np.uint32(arg)
+                    args[i] = self._parse_uint32_arg(arg)
                 elif 'S' in allowed:
-                    args[i] = np.int32(arg)
+                    args[i] = self._parse_int32_arg(arg)
                 else:
                     raise AsmSyntaxError(f'Immediate operand not support as argument {i}')
 
@@ -215,3 +213,33 @@ class Q1Parser:
         if len(reg_args) == 0:
             reg_args = None
         return args, reg_args
+
+    def _parse_reg_arg(self, arg):
+        try:
+            reg_nr = int(arg[1:])
+        except:
+            raise AsmSyntaxError(f"Invalid register '{arg}'") from None
+        if reg_nr < 0 or reg_nr > 63:
+            raise AsmSyntaxError(f"Invalid register '{arg}'")
+        return reg_nr
+
+    def _parse_label_arg(self, arg):
+        try:
+            line_nr = self.labels[arg[1:]]
+        except:
+            raise AsmSyntaxError(f'Label {arg} not defined') from None
+        return line_nr
+
+    def _parse_uint32_arg(self, arg):
+        try:
+            res = np.uint32(arg)
+        except (OverflowError, ValueError):
+            raise AsmSyntaxError(f'Invalid unsigned integer: {arg}') from None
+        return res
+
+    def _parse_int32_arg(self, arg):
+        try:
+            res = np.int32(arg)
+        except (OverflowError, ValueError):
+            raise AsmSyntaxError(f'Invalid integer: {arg}')
+        return res
