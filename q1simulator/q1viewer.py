@@ -57,6 +57,7 @@ def plot_q1asm_files(plot_defs,
     sim.config('max_core_cycles', max_core_cycles)
     sim.config('skip_loops', () if render_repetitions else ("_start", ))
     sim.config('skip_wait_sync', skip_wait_sync)
+    # sim.config('trace', True)
     sim.ignore_triggers = True
 
     for i, plot in enumerate(plot_defs):
@@ -72,7 +73,7 @@ def plot_q1asm_files(plot_defs,
 
         for ch in plot.out:
             path = ch % 2
-            sequencer.set(f'connect_out{ch}', 'I' if path == 0 else 'Q')
+            sequencer.parameters[f'connect_out{ch}'].set('I' if path == 0 else 'Q')
 
         sequencer.sequence(plot.filename)
         sequencer.sync_en(True)

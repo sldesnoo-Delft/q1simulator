@@ -226,8 +226,8 @@ class Q1Plotter:
                 ]
 
         for param_name in param_names:
-            value = getattr(cluster_seq, param_name).cache()
+            value = cluster_seq.parameters[param_name].cache()
             if value is not None:
-                sim_seq.set(param_name, value)
+                sim_seq.parameters[param_name].set(value)
 
         return True
