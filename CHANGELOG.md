@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.14.5] - 2024-10-25
+
+- Added simulated output after analogue filter of QCM (approximation).
+
 ## \[0.14.4] - 2024-10-18
 
 - Update to qcodes 0.49

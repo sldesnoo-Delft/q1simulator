@@ -254,6 +254,7 @@ class Q1Module(qc.instrument.InstrumentBase):
              t_min: float = None,
              t_max: float = None,
              channels: list[str] | list[int] | None = None,
+             analogue_filter: bool = False,
              **kwargs):
         for i, seq in enumerate(self.sequencers):
             if channels is not None and i not in channels and seq.label not in channels:
@@ -261,7 +262,7 @@ class Q1Module(qc.instrument.InstrumentBase):
                 continue
             # assume only sequencers in sync mode have executed.
             if seq.sync_en():
-                seq.plot(t_min=t_min, t_max=t_max)
+                seq.plot(t_min=t_min, t_max=t_max, analogue_filter=analogue_filter)
 
     def print_acquisitions(self):
         for i, seq in enumerate(self.sequencers):
@@ -369,9 +370,10 @@ class Q1Simulator(qc.Instrument, Q1Module):
              t_min: float = None,
              t_max: float = None,
              channels: list[str] | list[int] | None = None,
+             analogue_filter=False,
              **kwargs):
         pt.figure()
-        super().plot(t_min=t_min, t_max=t_max, channels=channels)
+        super().plot(t_min=t_min, t_max=t_max, channels=channels, analogue_filter=analogue_filter)
         pt.grid(True)
         pt.legend()
         pt.xlabel('[ns]')

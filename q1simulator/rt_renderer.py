@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as pt
 
 from .triggers import TriggerEvent
+from .analogue_filter import AnalogueFilter
 
 
 logger = logging.getLogger(__name__)
@@ -524,13 +525,16 @@ class Renderer:
         if self.trace_enabled:
             print(f'{self.time:-6} {msg}')
 
-    def plot(self, v_max, plot_label, t_min=None, t_max=None):
+    def plot(self, v_max, plot_label, t_min=None, t_max=None, analogue_filter=False):
         def time_window(out, t_min, t_max):
             if t_max is not None:
                 out = out[:t_max]
             if t_min is not None:
                 out = out[t_min:]
             return out
+
+        if analogue_filter:
+            _filter = AnalogueFilter("QCM")
 
         scaling = v_max/2**15
         t_end = self.time
@@ -541,6 +545,8 @@ class Renderer:
 
         if t_min is not None:
             t = np.arange(t_min, min(t_max, t_end) if t_max is not None else t_end)
+        elif analogue_filter:
+            t = np.arange(0, min(t_max, t_end) if t_max is not None else t_end)
 
         n_ch_out = 0
         for value in self.output_selected_path:
@@ -561,8 +567,11 @@ class Renderer:
                 out0 = scaling * np.concatenate(self.out0)
                 out0 = time_window(out0, t_min, t_max)
                 # print(f'Average V: {np.mean(out0)*1000:5.2f} mV')
-                if t_min is None:
+                if t_min is None and not analogue_filter:
                     pt.plot(out0, label=label)
+                elif analogue_filter:
+                    ta, outa = _filter.get_awg_output(t, out0)
+                    pt.plot(ta, outa, label=label)
                 else:
                     pt.plot(t, out0, label=label)
             if value in ('Q', 'IQ'):
@@ -571,8 +580,11 @@ class Renderer:
                 out1 = scaling * np.concatenate(self.out1)
                 out1 = time_window(out1, t_min, t_max)
                 # print(f'Average V: {np.mean(out1)*1000:5.2f} mV')
-                if t_min is None:
+                if t_min is None and not analogue_filter:
                     pt.plot(out1, label=label)
+                elif analogue_filter:
+                    ta, outa = _filter.get_awg_output(t, out1)
+                    pt.plot(ta, outa, label=label)
                 else:
                     pt.plot(t, out1, label=label)
         for i, m_list in enumerate(self.marker_out):

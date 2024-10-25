@@ -465,12 +465,13 @@ class Q1Sequencer(InstrumentChannel):
     def set_trigger_events(self, events):
         self._trigger_events = events
 
-    def plot(self, t_min=None, t_max=None):
+    def plot(self, t_min=None, t_max=None, analogue_filter=False):
         self.rt_renderer.plot(
             self._v_max,
             plot_label=self.label,
             t_min=t_min,
             t_max=t_max,
+            analogue_filter=analogue_filter,
             )
 
     def print_registers(self, reg_nrs=None):

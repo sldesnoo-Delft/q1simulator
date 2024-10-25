@@ -205,6 +205,7 @@ class Cluster(qc.Instrument):
              channels: list[str] | list[int] | None = None,
              modules: list[int] | None = None,
              create_figure: bool | str = True,
+             analogue_filter: bool = False,
              **kwargs):
         """Plots the simulated output of the cluster.
 
@@ -217,6 +218,7 @@ class Cluster(qc.Instrument):
                 If True create a new figure.
                 If False only pyplot.plot() is called without creating figure or setting axis labels.
                 If "modules" creates a new figure per module.
+            analogue_filter: plot result after applying (estimated) analog filter.
         """
         if create_figure == True:
             pt.figure()
@@ -234,6 +236,6 @@ class Cluster(qc.Instrument):
                 pt.grid(True)
                 pt.xlabel('[ns]')
                 pt.ylabel('[V]')
-            module.plot(t_min=t_min, t_max=t_max, channels=channels)
+            module.plot(t_min=t_min, t_max=t_max, channels=channels, analogue_filter=analogue_filter)
             pt.legend()
         pt.show()
