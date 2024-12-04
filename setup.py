@@ -14,4 +14,8 @@ setup(name="q1simulator",
         'qblox_instruments',
         'numpy',
       ],
+    package_data={
+        "q1simulator": ["*.hdf5"],
+        },
+    license='MIT',
 	)

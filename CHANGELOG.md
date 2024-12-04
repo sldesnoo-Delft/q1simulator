@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.14.7] - 2024-12-04
+
+- Added missing file with filter data.
+
 ## \[0.14.6] - 2024-12-04
 
 - Added simulated output after analogue filter to Q1Plotter.
