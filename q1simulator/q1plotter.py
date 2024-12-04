@@ -140,6 +140,7 @@ class Q1Plotter:
              channels: list[str] | list[int] | None = None,
              modules: list[int] | None = None,
              create_figure: bool | str = True,
+             analogue_filter=False,
              ):
         """Plots the simulated output of the cluster.
 
@@ -152,6 +153,7 @@ class Q1Plotter:
                 If True create a new figure.
                 If False only pyplot.plot() is called without creating figure or setting axis labels.
                 If "modules" creates a new figure per module.
+            analogue_filter: plot result after applying (estimated) analog filter.
         """
         end_time = self._simulator.get_simulation_end_time()
         if t_max is not None and t_max > self.max_render_time:
@@ -165,7 +167,9 @@ class Q1Plotter:
             t_max=t_max,
             channels=channels,
             modules=modules,
-            create_figure=create_figure)
+            create_figure=create_figure,
+            analogue_filter=analogue_filter,
+            )
 
     @staticmethod
     def _copy_settings(cluster_seq, sim_seq, is_qcm, is_rf):

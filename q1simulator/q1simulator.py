@@ -372,6 +372,14 @@ class Q1Simulator(qc.Instrument, Q1Module):
              channels: list[str] | list[int] | None = None,
              analogue_filter=False,
              **kwargs):
+        """Plots the simulated output of the module.
+
+        Args:
+            t_min: minimum time in the plot.
+            t_max: maximum time in the plot.
+            channels: If not None specifies the channels to plot by name or sequencer number.
+            analogue_filter: plot result after applying (estimated) analog filter.
+        """
         pt.figure()
         super().plot(t_min=t_min, t_max=t_max, channels=channels, analogue_filter=analogue_filter)
         pt.grid(True)
