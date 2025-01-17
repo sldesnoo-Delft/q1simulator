@@ -17,7 +17,10 @@ if qblox_version >= Version('0.12'):
     if qblox_version < Version('0.14'):
         from qblox_instruments import SequencerStatusOld
 
-from qblox_instruments import SequencerState, SequencerStatus, SequencerStatusFlags
+if qblox_version < Version('0.14'):
+    from qblox_instruments import SequencerState
+
+from qblox_instruments import SequencerStatus, SequencerStatusFlags
 
 from .q1core import Q1Core
 from .rt_renderer import Renderer, MockDataEntry
@@ -100,7 +103,7 @@ class Q1Sequencer(InstrumentChannel):
             self.add_parameter(f'connect_out{i}',
                                set_cmd=partial(self._connect_out, i))
 
-        for i in range(1,16):
+        for i in range(1, 16):
             self.add_parameter(f'trigger{i}_count_threshold',
                                set_cmd=partial(self._set_trigger_count_threshold, i))
             self.add_parameter(f'trigger{i}_threshold_invert',
@@ -281,7 +284,7 @@ class Q1Sequencer(InstrumentChannel):
         if qblox_version < Version('0.12'):
             def get_state(self):
                 flags = [
-                    SequencerStatusFlags[flag.replace(' ','_')]
+                    SequencerStatusFlags[flag.replace(' ', '_')]
                     for flag in self.q1core.errors | self.rt_renderer.errors
                     ]
                 if self._is_qrm:
@@ -294,7 +297,7 @@ class Q1Sequencer(InstrumentChannel):
             # deprecated Old version
             def get_state(self):
                 flags = [
-                    SequencerStatusFlags[flag.replace(' ','_')]
+                    SequencerStatusFlags[flag.replace(' ', '_')]
                     for flag in self.q1core.errors | self.rt_renderer.errors
                     ]
                 if self._is_qrm:
@@ -315,7 +318,7 @@ class Q1Sequencer(InstrumentChannel):
             info_flags = []
             warn_flags = []
             error_flags = [
-                SequencerStatusFlags[flag.replace(' ','_')]
+                SequencerStatusFlags[flag.replace(' ', '_')]
                 for flag in self.q1core.errors | self.rt_renderer.errors
                 ]
             log = []
@@ -341,7 +344,7 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer.set_trigger_count_threshold(address, count)
         self.rt_renderer.set_trigger_threshold_invert(address, invert)
 
-    def get_trigger_thresholding(self, address: int) -> tuple[int,bool]:
+    def get_trigger_thresholding(self, address: int) -> tuple[int, bool]:
         return (
             self.rt_renderer.get_trigger_count_threshold(address),
             self.rt_renderer.get_trigger_threshold_invert(address)
@@ -368,24 +371,24 @@ class Q1Sequencer(InstrumentChannel):
     def get_acquisition_data(self):
         if not self._is_qrm:
             raise NotImplementedError('Instrument type is not QRM')
-        cnt,data,thresholded = self.rt_renderer.get_acquisition_data()
+        cnt, data, thresholded = self.rt_renderer.get_acquisition_data()
         result = {}
         for name, datadict in self.acquisition_bins.items():
             index = int(datadict['index'])
             acq_count = cnt[index]
-            path_data = data[index]/acq_count[:,None]
+            path_data = data[index]/acq_count[:, None]
             threshold = thresholded[index]/acq_count
 
             result[name] = {
-                'index':index,
-                'acquisition':{
-                    'bins':{
+                'index': index,
+                'acquisition': {
+                    'bins': {
                         'integration': {
-                            'path0':list(path_data[:,0]),
-                            'path1':list(path_data[:,1]),
+                            'path0': list(path_data[:, 0]),
+                            'path1': list(path_data[:, 1]),
                             },
-                        'threshold':threshold,
-                        'avg_cnt':list(acq_count),
+                        'threshold': threshold,
+                        'avg_cnt': list(acq_count),
                     }
                 }}
         return result

@@ -16,7 +16,7 @@ class Q1Plotter:
                  cluster: Cluster,
                  max_render_time=2e6,
                  max_core_cycles=1e7,
-                 skip_loops = ("_start", ),
+                 skip_loops=("_start", ),
                  skip_wait_sync=True,
                  acq_trigger_value=0,
                  ):
@@ -195,7 +195,7 @@ class Q1Plotter:
                 'offset_awg_path1',
                 ]
 
-        for i in range(1,16):
+        for i in range(1, 16):
             param_names += [
                 f'trigger{i}_count_threshold',
                 f'trigger{i}_threshold_invert',
