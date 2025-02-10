@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.15.1] - 2025-02-10
+
+- Fixed `set_freq` in Q1ASM.
+
 ## \[0.15.0] - 2025-01-17
 
 - Update to qblox-instruments 0.15.0

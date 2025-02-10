@@ -20,19 +20,19 @@ MockDataEntry = float | complex | Sequence[float]
 
 @dataclass
 class Settings:
-    marker : int = 0
+    marker: int = 0
     awg_offs: np.ndarray = field(default_factory=lambda: np.zeros(2, np.int16))
     awg_gain: np.ndarray = field(default_factory=lambda: np.full(2, 32767, np.int16))
-    reset_phase : bool = False
+    reset_phase: bool = False
     relative_phase: float | None = None
-    phase_shift : float = 0
-    frequency : float | None = None
+    phase_shift: float = 0
+    frequency: float | None = None
 
 
 @dataclass
 class AcqConf:
-    length: int = 0 # max 16 ms
-    rotation: float = 0.0 # deg.
+    length: int = 0  # max 16 ms
+    rotation: float = 0.0  # deg.
     threshold: float = 0.0
     trigger_en: bool = False
     trigger_addr: int = 0
@@ -49,7 +49,7 @@ def _phase2float(phase_uint32):
 def _freq2Hz(freq_uint32):
     # freq in Hz
     # convert uint to int32 if value > 2**31
-    res = np.int32(freq_uint32)
+    res = np.int32(freq_uint32) / 4
     return res
 
 
@@ -108,12 +108,12 @@ class Renderer:
         self.relative_phase = 0.0
         self.delta_phase = 0.0
         self.wave_start = 0
-        self.waves_end = (0,0)
+        self.waves_end = (0, 0)
         self.waves = (None, None)
         self.out0 = []
         self.out1 = []
-        self.marker_out = [list() for _ in range(4)] # a list per marker
-        self.acq_times = {i:[] for i in self.acq_bins}
+        self.marker_out = [list() for _ in range(4)]  # a list per marker
+        self.acq_times = {i: [] for i in self.acq_bins}
         self.acq_buffer = AcqBuffer()
         self.acq_trigger_events = []
         self.mock_data = {}
@@ -136,9 +136,9 @@ class Renderer:
     def set_waveforms(self, wavedict):
         self.wavedict_float = wavedict
         self.wavedict = {
-                key:float2int16array(value)
-                for key, value in wavedict.items()
-                }
+            key: float2int16array(value)
+            for key, value in wavedict.items()
+        }
 
     def set_weights(self, weightsdict):
         self.acq_weights = weightsdict
@@ -181,7 +181,7 @@ class Renderer:
         self.next_settings.marker = value
 
     def set_freq(self, freq):
-        self.next_settings.frequency =_freq2Hz(freq)
+        self.next_settings.frequency = _freq2Hz(freq)
 
     def reset_ph(self):
         self.next_settings.reset_phase = True
@@ -238,9 +238,9 @@ class Renderer:
             self._error('ACQ WEIGHT PLAYBACK INDEX INVALID PATH 1')
         else:
             duration = max(
-                    len(self.acq_weights[weight0]),
-                    len(self.acq_weights[weight1])
-                    )
+                len(self.acq_weights[weight0]),
+                len(self.acq_weights[weight1])
+            )
             self._add_acquisition(bins, bin_index, duration)
         self._render(wait_after)
 
@@ -262,22 +262,22 @@ class Renderer:
             return
         self._process_triggers()
         # numpy arrays
-        mask_ar = np.unpackbits([np.uint8(mask>>8), np.uint8(mask&0xFF)])[:0:-1]
+        mask_ar = np.unpackbits([np.uint8(mask >> 8), np.uint8(mask & 0xFF)])[:0:-1]
         state = ((self.latch_regs >= self.threshold_count) ^ self.threshold_invert) & mask_ar
         bits_set = np.sum(state)
         bits_mask = np.sum(mask_ar)
-        if op == 0: # OR
+        if op == 0:  # OR
             match = bits_set != 0
-        elif op == 1: # NOR
+        elif op == 1:  # NOR
             match = bits_set == 0
-        elif op == 2: # AND
+        elif op == 2:  # AND
             match = bits_set == bits_mask
-        elif op == 3: # NAND
+        elif op == 3:  # NAND
             match = bits_set != bits_mask
-        elif op == 4: # XOR
-            match = (bits_set%2) == 1
-        elif op == 5: # XNOR
-            match = (bits_set%2) == 0
+        elif op == 4:  # XOR
+            match = (bits_set % 2) == 1
+        elif op == 5:  # XNOR
+            match = (bits_set % 2) == 0
         else:
             raise Exception(f'Unknown operator {op}')
         logger.debug(f'set_cond 1, {mask}, {op}, {else_wait}')
@@ -386,7 +386,7 @@ class Renderer:
 
         if time & 0x0003:
             logger.error(f'{self.name}: wait time not aligned on '
-                          f'4 ns boundary: {time} ns (offset={time&0x03} ns)')
+                         f'4 ns boundary: {time} ns (offset={time & 0x03} ns)')
             self._error('TIME NOT ALIGNED')
 
         # 16 bits, 4 ns resolution
@@ -590,9 +590,9 @@ class Renderer:
         for i, m_list in enumerate(self.marker_out):
             if len(m_list) == 0:
                 continue
-            l = [[0,0]]
+            l = [[0, 0]]
             l += m_list
-            l.append([t_end,0])
+            l.append([t_end, 0])
             line = np.array(l).T
             label = plot_label + f'-M{i}'
             pt.plot(line[0], line[1], ':', label=label)
@@ -613,6 +613,7 @@ class Renderer:
     def get_acquisition_list(self):
         return self.acq_times
 
+
 class AcqBuffer:
     def __init__(self):
         self.buffer = []
@@ -628,4 +629,3 @@ class AcqBuffer:
         if not overflow:
             b.append(time)
         return not overflow
-
