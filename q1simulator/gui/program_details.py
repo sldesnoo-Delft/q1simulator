@@ -24,22 +24,22 @@ class ProgramDetailsWidget(QtWidgets.QWidget):
 
     def create_table(self):
         table = QtWidgets.QTreeWidget()
-        table.setMinimumHeight(200)
-        table.setMinimumWidth(500)
+        table.setMinimumHeight(400)
+        table.setMinimumWidth(540)
         table.setColumnCount(7)
-        table.setColumnWidth(0, 90)
-        table.setColumnWidth(1, 90)
-        table.setColumnWidth(2, 60)
-        table.setColumnWidth(3, 60)
-        table.setColumnWidth(4, 60)
-        table.setColumnWidth(5, 60)
-        table.setColumnWidth(6, 60)
+        table.setColumnWidth(0, 100)
+        table.setColumnWidth(1, 100)
+        table.setColumnWidth(2, 50)
+        table.setColumnWidth(3, 50)
+        table.setColumnWidth(4, 50)
+        table.setColumnWidth(5, 90)
+        table.setColumnWidth(6, 80)
         table.setHeaderLabels([
             "Channel",
             "Module",
             "Paths",
-            "Outputs",
-            "Inputs",
+            "Out",
+            "In",
             "NCO",
             "Duration",
             ])

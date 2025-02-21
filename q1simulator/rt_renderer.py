@@ -605,10 +605,7 @@ class Renderer:
         output = self.get_output(v_max, plot_label, t_min=t_min, t_max=t_max, analogue_filter=analogue_filter)
 
         for name, data in output.items():
-            print(name)
             t, out = data
-            print(t)
-            print(out)
             if isinstance(t, Number):
                 pt.plot(out, label=name)
             elif len(name) > 4 and name[-3:-1] == '-M':

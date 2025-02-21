@@ -57,7 +57,7 @@ class Q1ProgramBrowser(QtWidgets.QMainWindow):
         self._path = path
 
         self.setWindowTitle(self._WINDOW_TITLE)
-        self.resize(800, 500)
+        self.resize(860, 600)
         self.create_ui()
         self.fill_program_list()
         self.show()
@@ -68,7 +68,7 @@ class Q1ProgramBrowser(QtWidgets.QMainWindow):
     def create_ui(self):
         content = QtWidgets.QWidget()
         self._list_widget = QtWidgets.QListWidget()
-        self._list_widget.setMinimumWidth(260)
+        self._list_widget.setMinimumWidth(300)
         self._list_widget.itemSelectionChanged.connect(self._show_program_info)
 
         self._program_details = ProgramDetailsWidget(self)
