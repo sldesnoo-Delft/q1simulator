@@ -543,10 +543,11 @@ class Renderer:
             t_end = self.max_render_time
             print(f'{self.name}: Rendering truncated at {max_ms:3.1f} ms. Total time: {self.time/1e6:4.1f} ms')
 
+        t_max = min(t_max, t_end) if t_max is not None else t_end
         if t_min is not None:
-            t = np.arange(t_min, min(t_max, t_end) if t_max is not None else t_end)
+            t = np.arange(t_min, t_max)
         elif analogue_filter:
-            t = np.arange(0, min(t_max, t_end) if t_max is not None else t_end)
+            t = np.arange(0, t_max)
         else:
             # only pass 1 value instead of full array
             t = t_max
@@ -604,7 +605,10 @@ class Renderer:
         output = self.get_output(v_max, plot_label, t_min=t_min, t_max=t_max, analogue_filter=analogue_filter)
 
         for name, data in output.items():
+            print(name)
             t, out = data
+            print(t)
+            print(out)
             if isinstance(t, Number):
                 pt.plot(out, label=name)
             elif len(name) > 4 and name[-3:-1] == '-M':

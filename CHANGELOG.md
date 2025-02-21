@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.15.3] - 2025-02-21
+
+- Fixed bug in plotting introduced in 0.15.2.
+
 ## \[0.15.2] - 2025-02-21
 
 - Added Q1ProgramBrowser (initial version).
