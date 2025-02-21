@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.15.2] - 2025-02-21
+
+- Added Q1ProgramBrowser (initial version).
+
 ## \[0.15.1] - 2025-02-10
 
 - Fixed `set_freq` in Q1ASM.

@@ -477,6 +477,15 @@ class Q1Sequencer(InstrumentChannel):
             analogue_filter=analogue_filter,
             )
 
+    def get_output(self, t_min=None, t_max=None, analogue_filter=False):
+        return self.rt_renderer.get_output(
+            self._v_max,
+            plot_label=self.label,
+            t_min=t_min,
+            t_max=t_max,
+            analogue_filter=analogue_filter,
+            )
+
     def print_registers(self, reg_nrs=None):
         self.q1core.print_registers(reg_nrs)
 

@@ -410,7 +410,7 @@ class Renderer:
         path[1] = s.awg_offs[1]
 
         for i in range(2):
-            if self.waves_end[0] > t_start:
+            if self.waves_end[i] > t_start:
                 end = min(self.waves_end[i], t_end)
                 data = self.waves[i][t_start-self.wave_start:end-self.wave_start]
                 path[i][0:len(data)] += (s.awg_gain[i] * data) >> 15
@@ -525,7 +525,7 @@ class Renderer:
         if self.trace_enabled:
             print(f'{self.time:-6} {msg}')
 
-    def plot(self, v_max, plot_label, t_min=None, t_max=None, analogue_filter=False):
+    def get_output(self, v_max, plot_label, t_min=None, t_max=None, analogue_filter=False):
         def time_window(out, t_min, t_max):
             if t_max is not None:
                 out = out[:t_max]
@@ -547,6 +547,9 @@ class Renderer:
             t = np.arange(t_min, min(t_max, t_end) if t_max is not None else t_end)
         elif analogue_filter:
             t = np.arange(0, min(t_max, t_end) if t_max is not None else t_end)
+        else:
+            # only pass 1 value instead of full array
+            t = t_max
 
         n_ch_out = 0
         for value in self.output_selected_path:
@@ -556,6 +559,8 @@ class Renderer:
                 n_ch_out += 2
         if n_ch_out == 0:
             print(f'No outputs enabled for {plot_label}')
+
+        output = {}
 
         for i, value in enumerate(self.output_selected_path):
             label = plot_label
@@ -567,26 +572,23 @@ class Renderer:
                 out0 = scaling * np.concatenate(self.out0)
                 out0 = time_window(out0, t_min, t_max)
                 # print(f'Average V: {np.mean(out0)*1000:5.2f} mV')
-                if t_min is None and not analogue_filter:
-                    pt.plot(out0, label=label)
-                elif analogue_filter:
+                if analogue_filter:
                     ta, outa = _filter.get_awg_output(t, out0)
-                    pt.plot(ta, outa, label=label)
+                    output[label] = (ta, outa)
                 else:
-                    pt.plot(t, out0, label=label)
+                    output[label] = (t, out0)
             if value in ('Q', 'IQ'):
                 if n_ch_out > 1:
                     label += '-Q'
                 out1 = scaling * np.concatenate(self.out1)
                 out1 = time_window(out1, t_min, t_max)
                 # print(f'Average V: {np.mean(out1)*1000:5.2f} mV')
-                if t_min is None and not analogue_filter:
-                    pt.plot(out1, label=label)
-                elif analogue_filter:
+                if analogue_filter:
                     ta, outa = _filter.get_awg_output(t, out1)
-                    pt.plot(ta, outa, label=label)
+                    output[label] = (ta, outa)
                 else:
-                    pt.plot(t, out1, label=label)
+                    output[label] = (t, out1)
+
         for i, m_list in enumerate(self.marker_out):
             if len(m_list) == 0:
                 continue
@@ -595,7 +597,22 @@ class Renderer:
             l.append([t_end, 0])
             line = np.array(l).T
             label = plot_label + f'-M{i}'
-            pt.plot(line[0], line[1], ':', label=label)
+            output[label] = (line[0], line[1])
+        return output
+
+    def plot(self, v_max, plot_label, t_min=None, t_max=None, analogue_filter=False):
+        output = self.get_output(v_max, plot_label, t_min=t_min, t_max=t_max, analogue_filter=analogue_filter)
+
+        for name, data in output.items():
+            t, out = data
+            if isinstance(t, Number):
+                pt.plot(out, label=name)
+            elif len(name) > 4 and name[-3:-1] == '-M':
+                # marker output
+                pt.plot(t, out, ":", label=name)
+            else:
+                pt.plot(t, out, label=name)
+
         limits = {}
         if t_min is not None:
             limits['left'] = t_min

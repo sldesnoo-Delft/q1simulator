@@ -13,12 +13,12 @@ from .qblox_version import qblox_version
 class PlotDef:
     filename: str
     sequencer_name: str | None = None
-    out: list[int] = field(default_factory=lambda:[0,1])
+    out: list[int] = field(default_factory=lambda: [0, 1])
     lo_frequency: float | None = None
 
 
 def plot_q1asm_file(filename,
-                    out=[0,1],
+                    out=[0, 1],
                     lo_frequency=None,
                     max_render_time=2e6,
                     max_core_cycles=1e7,
@@ -82,7 +82,7 @@ def plot_q1asm_files(plot_defs,
 
     sim.start_sequencer()
 
-    for i,plot in enumerate(plot_defs):
+    for i, plot in enumerate(plot_defs):
         name = plot.sequencer_name if plot.sequencer_name else f'seq{i}'
         if qblox_version < Version("0.12"):
             print(f'State {name}: {sim.get_sequencer_state(i)}')
@@ -101,4 +101,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-   main(sys.argv[1:])
+    main(sys.argv[1:])

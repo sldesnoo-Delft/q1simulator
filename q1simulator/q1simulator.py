@@ -264,6 +264,25 @@ class Q1Module(qc.instrument.InstrumentBase):
             if seq.sync_en():
                 seq.plot(t_min=t_min, t_max=t_max, analogue_filter=analogue_filter)
 
+    def get_output(self,
+                   t_min: float = None,
+                   t_max: float = None,
+                   channels: list[str] | list[int] | None = None,
+                   analogue_filter: bool = False,
+                   ):
+        output = {}
+        for i, seq in enumerate(self.sequencers):
+            if channels is not None and i not in channels and seq.label not in channels:
+                # skip channel
+                continue
+            # assume only sequencers in sync mode have executed.
+            if seq.sync_en():
+                # sequencer may generate output on muliple outputs (I, Q, marker)
+                seq_output = seq.get_output(t_min=t_min, t_max=t_max, analogue_filter=analogue_filter)
+                output.update(seq_output)
+
+        return output
+
     def print_acquisitions(self):
         for i, seq in enumerate(self.sequencers):
             data = self.get_acquisitions(i)
