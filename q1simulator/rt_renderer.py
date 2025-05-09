@@ -9,6 +9,7 @@ from functools import wraps
 import numpy as np
 import matplotlib.pyplot as pt
 
+from .qblox_version import qblox_version, Version
 from .triggers import TriggerEvent
 from .analogue_filter import AnalogueFilter
 
@@ -98,6 +99,7 @@ class Renderer:
         self.threshold_count = np.full(15, 0, dtype=np.uint16)
         self.threshold_invert = np.zeros(15, dtype=bool)
         self.acq_conf = AcqConf()
+        self.flip_phase_shift = qblox_version < Version("0.16")
 
     def reset(self):
         # start with the old settings / values set via qcodes.
@@ -372,12 +374,12 @@ class Renderer:
             m_old = (old_marker & m) != 0
             m_new = (new_marker & m) != 0
             if m_new != m_old:
-                l = self.marker_out[i]
+                marker_out = self.marker_out[i]
                 if self.time < self.max_render_time:
-                    l += [[self.time, m_old], [self.time, m_new]]
-                elif l[-1][0] < self.max_render_time:
+                    marker_out += [[self.time, m_old], [self.time, m_new]]
+                elif marker_out[-1][0] < self.max_render_time:
                     # add final marker step
-                    l += [[self.max_render_time, m_old], [self.max_render_time, 0]]
+                    marker_out += [[self.max_render_time, m_old], [self.max_render_time, 0]]
 
     def _render(self, time):
         if time < 4:
@@ -418,7 +420,7 @@ class Renderer:
         if self.mod_en_awg:
             t = np.arange(t_start, t_end)
             phase_offset = self.relative_phase + self.delta_phase
-            if self.nco_frequency < 0:
+            if self.flip_phase_shift and self.nco_frequency < 0:
                 phase_offset = -phase_offset
             phase = 2*np.pi*(phase_offset + self.nco_phase_offset + self.nco_frequency * 1e-9 * t)
             nco = np.exp(1j*phase)
@@ -525,7 +527,8 @@ class Renderer:
         if self.trace_enabled:
             print(f'{self.time:-6} {msg}')
 
-    def get_output(self, v_max, plot_label, t_min=None, t_max=None, analogue_filter=False):
+    def get_output(self, v_max, plot_label, t_min=None, t_max=None,
+                   analogue_filter=False, output_frequency=4e9):
         def time_window(out, t_min, t_max):
             if t_max is not None:
                 out = out[:t_max]
@@ -534,7 +537,7 @@ class Renderer:
             return out
 
         if analogue_filter:
-            _filter = AnalogueFilter("QCM")
+            _filter = AnalogueFilter("QCM", output_frequency=output_frequency)
 
         scaling = v_max/2**15
         t_end = self.time
@@ -593,16 +596,18 @@ class Renderer:
         for i, m_list in enumerate(self.marker_out):
             if len(m_list) == 0:
                 continue
-            l = [[0, 0]]
-            l += m_list
-            l.append([t_end, 0])
-            line = np.array(l).T
+            points = [[0, 0]]
+            points += m_list
+            points.append([t_end, 0])
+            line = np.array(points).T
             label = plot_label + f'-M{i}'
             output[label] = (line[0], line[1])
         return output
 
-    def plot(self, v_max, plot_label, t_min=None, t_max=None, analogue_filter=False):
-        output = self.get_output(v_max, plot_label, t_min=t_min, t_max=t_max, analogue_filter=analogue_filter)
+    def plot(self, v_max, plot_label, t_min=None, t_max=None, analogue_filter=False, analogue_output_frequency=4e9):
+        output = self.get_output(v_max, plot_label, t_min=t_min, t_max=t_max,
+                                 analogue_filter=analogue_filter,
+                                 output_frequency=analogue_output_frequency)
 
         for name, data in output.items():
             t, out = data

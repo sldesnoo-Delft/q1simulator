@@ -134,4 +134,5 @@ class ProgramDetailsWidget(QtWidgets.QWidget):
             min_time=min_time,
             max_time=max_time,
             analogue_filter=self._analogue_cb.isChecked(),
+            analogue_output_frequency=4e9,
             )

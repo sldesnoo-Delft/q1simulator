@@ -64,7 +64,7 @@ class Cluster(qc.Instrument):
         # TODO return trigger count
         for par_name in self._cluster_parameters:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
-        for i in range(1,16):
+        for i in range(1, 16):
             par_name = f'trigger{i}_monitor_count'
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
 
@@ -73,7 +73,7 @@ class Cluster(qc.Instrument):
                                set_cmd=partial(self._log_set, par_name))
 
         self._modules = {}
-        for slot in range(1,21):
+        for slot in range(1, 21):
             name = f'module{slot}'
             if slot in modules:
                 module = ClusterModule(self, name, slot, sim_type=modules[slot])
@@ -206,6 +206,7 @@ class Cluster(qc.Instrument):
              modules: list[int] | None = None,
              create_figure: bool | str = True,
              analogue_filter: bool = False,
+             analogue_output_frequency: float = 4e9,
              **kwargs):
         """Plots the simulated output of the cluster.
 
@@ -219,8 +220,9 @@ class Cluster(qc.Instrument):
                 If False only pyplot.plot() is called without creating figure or setting axis labels.
                 If "modules" creates a new figure per module.
             analogue_filter: plot result after applying (estimated) analog filter.
+            analogue_output_frequency: sample rate of analogue output
         """
-        if create_figure == True:
+        if create_figure is True:
             pt.figure()
             pt.title('Cluster')
             pt.grid(True)
@@ -236,6 +238,7 @@ class Cluster(qc.Instrument):
                 pt.grid(True)
                 pt.xlabel('[ns]')
                 pt.ylabel('[V]')
-            module.plot(t_min=t_min, t_max=t_max, channels=channels, analogue_filter=analogue_filter)
+            module.plot(t_min=t_min, t_max=t_max, channels=channels, analogue_filter=analogue_filter,
+                        analogue_output_frequency=analogue_output_frequency)
             pt.legend()
         pt.show()

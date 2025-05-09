@@ -5,7 +5,7 @@ from qtpy import QtCore, QtWidgets
 
 from q1simulator.gui.program_details import ProgramDetailsWidget
 from q1simulator.gui.qt_utils import (
-    qt_log_exception,
+    # qt_log_exception,
     qt_init,
     qt_create_app,
     qt_run_app,
@@ -110,4 +110,5 @@ class Q1ProgramBrowser(QtWidgets.QMainWindow):
 
 
 if __name__ == "__main__":
-    ui = Q1ProgramBrowser(r"C:\measurements\qblox_programs", gui_style="dark")
+    path = r"C:\measurements\qblox_programs"
+    ui = Q1ProgramBrowser(path, gui_style="dark")

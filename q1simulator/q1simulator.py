@@ -93,7 +93,6 @@ class Q1Module(qc.instrument.InstrumentBase):
         'out0_in0_lo_freq_cal_type_default',
         ]
 
-
     # NOTE: No __init__() !!!
     # This class is used as a mixin. Although quite heavy mixin.
 
@@ -255,6 +254,7 @@ class Q1Module(qc.instrument.InstrumentBase):
              t_max: float = None,
              channels: list[str] | list[int] | None = None,
              analogue_filter: bool = False,
+             analogue_output_frequency: float = 4e9,
              **kwargs):
         for i, seq in enumerate(self.sequencers):
             if channels is not None and i not in channels and seq.label not in channels:
@@ -262,13 +262,16 @@ class Q1Module(qc.instrument.InstrumentBase):
                 continue
             # assume only sequencers in sync mode have executed.
             if seq.sync_en():
-                seq.plot(t_min=t_min, t_max=t_max, analogue_filter=analogue_filter)
+                seq.plot(t_min=t_min, t_max=t_max,
+                         analogue_filter=analogue_filter,
+                         analogue_output_frequency=analogue_output_frequency)
 
     def get_output(self,
                    t_min: float = None,
                    t_max: float = None,
                    channels: list[str] | list[int] | None = None,
                    analogue_filter: bool = False,
+                   output_frequency: float = 4e9,
                    ):
         output = {}
         for i, seq in enumerate(self.sequencers):
@@ -278,7 +281,9 @@ class Q1Module(qc.instrument.InstrumentBase):
             # assume only sequencers in sync mode have executed.
             if seq.sync_en():
                 # sequencer may generate output on muliple outputs (I, Q, marker)
-                seq_output = seq.get_output(t_min=t_min, t_max=t_max, analogue_filter=analogue_filter)
+                seq_output = seq.get_output(t_min=t_min, t_max=t_max,
+                                            analogue_filter=analogue_filter,
+                                            output_frequency=output_frequency)
                 output.update(seq_output)
 
         return output
@@ -389,7 +394,8 @@ class Q1Simulator(qc.Instrument, Q1Module):
              t_min: float = None,
              t_max: float = None,
              channels: list[str] | list[int] | None = None,
-             analogue_filter=False,
+             analogue_filter: bool = False,
+             analogue_output_frequency: float = 4e9,
              **kwargs):
         """Plots the simulated output of the module.
 
@@ -400,7 +406,9 @@ class Q1Simulator(qc.Instrument, Q1Module):
             analogue_filter: plot result after applying (estimated) analog filter.
         """
         pt.figure()
-        super().plot(t_min=t_min, t_max=t_max, channels=channels, analogue_filter=analogue_filter)
+        super().plot(t_min=t_min, t_max=t_max, channels=channels,
+                     analogue_filter=analogue_filter,
+                     analogue_output_frequency=analogue_output_frequency)
         pt.grid(True)
         pt.legend()
         pt.xlabel('[ns]')

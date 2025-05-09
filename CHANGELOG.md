@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.16.0] - 2025-05-09
+
+- Update to qblox-instruments 0.16.0
+- Added option to specify frequency to tender analogue output. Default changed to 4GSa/a (was 20 GSa/s)
+- Use pyproject.toml instead of setup.py
+
 ## \[0.15.4] - 2025-02-21
 
 - Removed unintended print statements.

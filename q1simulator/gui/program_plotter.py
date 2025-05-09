@@ -1,5 +1,6 @@
 from numbers import Number
 from packaging.version import Version
+from typing import Any
 
 import pyqtgraph as pg
 from qtpy import QtWidgets
@@ -70,7 +71,7 @@ class PlotWindow(QtWidgets.QMainWindow):
 
 def plot_simulation(
         path: str,
-        config: dict[str, any],
+        config: dict[str, Any],
         channels: list[str],
         min_time: int | None = None,
         max_time: int | None = None,
@@ -78,6 +79,7 @@ def plot_simulation(
         max_core_cycles: int = 10_000_000,
         render_repetitions: bool = False,
         skip_wait_sync: bool = True,
+        analogue_output_frequency: float = 4e9,
         ):
     global _sim_counter
 
@@ -139,6 +141,7 @@ def plot_simulation(
         t_min=min_time,
         t_max=max_time,
         analogue_filter=analogue_filter,
+        output_frequency=analogue_output_frequency,
         )
 
     pw = PlotWindow()
