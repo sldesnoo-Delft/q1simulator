@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -13,7 +14,7 @@ class Instruction:
     args: list[int | str] | None = None
     reg_args: list[int] | None = None
     func_name: str | None = None
-    func: any = None
+    func: Any = None
     clock_ticks: int = 1
 
 
