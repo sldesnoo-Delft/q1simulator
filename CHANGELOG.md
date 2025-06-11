@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.17.0] - 2025-06-11
+
+- Update to qblox-instruments v0.17.0
+
 ## \[0.16.0] - 2025-05-09
 
 - Update to qblox-instruments 0.16.0
