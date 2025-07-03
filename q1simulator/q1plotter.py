@@ -1,11 +1,9 @@
 import logging
 import os
-from packaging.version import Version
 
 from qcodes import Instrument
 from qblox_instruments import Cluster
 from .cluster import Cluster as SimCluster
-from .qblox_version import qblox_version
 
 
 logger = logging.getLogger(__name__)
@@ -204,22 +202,11 @@ class Q1Plotter:
                 f'trigger{i}_threshold_invert',
                 ]
 
-        if qblox_version >= Version('0.11'):
-            n_out_ch = 4 if is_qcm else 2
-            if is_rf:
-                n_out_ch //= 2
-            for ch in range(n_out_ch):
-                param_names += [f"connect_out{ch}"]
-        else:
-            param_names += [
-                'channel_map_path0_out0_en',
-                'channel_map_path1_out1_en',
-                ]
-            if is_qcm:
-                param_names += [
-                    'channel_map_path0_out2_en',
-                    'channel_map_path1_out3_en',
-                    ]
+        n_out_ch = 4 if is_qcm else 2
+        if is_rf:
+            n_out_ch //= 2
+        for ch in range(n_out_ch):
+            param_names += [f"connect_out{ch}"]
 
         if not is_qcm:
             param_names += [

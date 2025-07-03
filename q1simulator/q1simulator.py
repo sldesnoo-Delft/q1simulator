@@ -12,18 +12,11 @@ from .trigger_sorting import get_seq_trigger_info, sort_sequencers
 
 from qblox_instruments import (
         InstrumentClass, InstrumentType,
-        )
-
-if qblox_version >= Version('0.12'):
-    from qblox_instruments import (
         SystemStatuses, SystemStatus, SystemStatusSlotFlags,
         )
-    if qblox_version < Version('0.14'):
-        from qblox_instruments import SystemState, SystemStatusOld
-else:
-    from qblox_instruments import (
-        SystemState, SystemStatus, SystemStatusSlotFlags
-        )
+
+if qblox_version < Version('0.14'):
+    from qblox_instruments import SystemState, SystemStatusOld
 
 
 logger = logging.getLogger(__name__)
@@ -213,6 +206,7 @@ class Q1Module(qc.instrument.InstrumentBase):
     def stop_sequencer(self, sequencer: int | None = None):
         self.armed_seq = set()
 
+    # Deprecated API
     if qblox_version < Version('0.14'):
         def get_sequencer_state(self, seq_nr, timeout=0):
             return self.sequencers[seq_nr].get_state()
@@ -220,12 +214,11 @@ class Q1Module(qc.instrument.InstrumentBase):
         def get_acquisition_state(self, seq_nr, timeout=0):
             return self.sequencers[seq_nr].get_acquisition_state()
 
-    if qblox_version >= Version('0.12'):
-        def get_sequencer_status(self, seq_nr, timeout=0):
-            return self.sequencers[seq_nr].get_status()
+    def get_sequencer_status(self, seq_nr, timeout=0):
+        return self.sequencers[seq_nr].get_status()
 
-        def get_acquisition_status(self, seq_nr, timeout=0):
-            return self.sequencers[seq_nr].get_acquisition_status()
+    def get_acquisition_status(self, seq_nr, timeout=0):
+        return self.sequencers[seq_nr].get_acquisition_status()
 
     def get_acquisitions(self, seq_nr, timeout=0):
         return self.sequencers[seq_nr].get_acquisition_data()
@@ -356,23 +349,17 @@ class Q1Simulator(qc.Instrument, Q1Module):
         self.invalidate_cache()
         super().reset()
 
-    if qblox_version >= Version('0.12'):
-        def get_system_status(self):
-            return SystemStatus(
-                SystemStatuses.OKAY,
-                [],
-                SystemStatusSlotFlags({}))
+    def get_system_status(self):
+        return SystemStatus(
+            SystemStatuses.OKAY,
+            [],
+            SystemStatusSlotFlags({}))
 
-        if qblox_version < Version('0.14'):
-            def get_system_state(self):
-                return SystemState(
-                    SystemStatusOld.OKAY,
-                    [],
-                    SystemStatusSlotFlags({}))
-    else:
+    if qblox_version < Version('0.14'):
+        # Deprecated API
         def get_system_state(self):
             return SystemState(
-                SystemStatus.OKAY,
+                SystemStatusOld.OKAY,
                 [],
                 SystemStatusSlotFlags({}))
 

@@ -126,15 +126,11 @@ def plot_simulation(
     sim.start_sequencer()
 
     for i, ch_name in enumerate(channels):
-        if qblox_version < Version("0.12"):
-            state = sim.get_sequencer_state(i)
-            print(f"State {ch_name}: {state.status}, {[str(flag) for flag in state.flags]}")
-        else:
-            status = sim.get_sequencer_status(i)
-            print(f"State {ch_name}: {status.status} - {status.state}, {[str(flag) for flag in status.info_flags]}")
-            if status.warn_flags or status.err_flags:
-                print(f"  warnings: {[str(flag) for flag in status.warn_flags]}, "
-                      f"errors: {[str(flag) for flag in status.err_flags]}, log: {status.log}")
+        status = sim.get_sequencer_status(i)
+        print(f"State {ch_name}: {status.status} - {status.state}, {[str(flag) for flag in status.info_flags]}")
+        if status.warn_flags or status.err_flags:
+            print(f"  warnings: {[str(flag) for flag in status.warn_flags]}, "
+                  f"errors: {[str(flag) for flag in status.err_flags]}, log: {status.log}")
 
     # plot
     output = sim.get_output(
