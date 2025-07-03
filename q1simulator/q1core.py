@@ -8,11 +8,14 @@ from .q1parser import Q1Parser
 
 logger = logging.getLogger(__name__)
 
+
 class Halt(Exception):
     pass
 
+
 class Abort(Exception):
     pass
+
 
 class Illegal(Exception):
     pass
@@ -23,7 +26,7 @@ class Q1Core:
         self.name = name
         self.renderer = renderer
         self._is_qrm = is_qrm
-        self.max_core_cycles= 10_000_000
+        self.max_core_cycles = 10_000_000
         self.skip_loops = ("_start", )
         self.R = np.zeros(64, dtype=np.uint32)
         self.lines = []
@@ -76,7 +79,7 @@ class Q1Core:
         orig_err_settings = np.seterr(over='ignore')
         try:
             cntr = 0
-            while(True):
+            while True:
                 cntr += 1
                 instr = self.instructions[self.iptr]
                 self.iptr += 1
@@ -104,7 +107,7 @@ class Q1Core:
             msg = f'Execution aborted: {ex.args[0]}'
             self._print_error_msg(msg, instr, cntr)
             self._error(ex.args[1])
-        except:
+        except Exception:
             self._print_error_msg('Exception', instr, cntr)
             self._error('OOPS!!')
             raise
@@ -113,7 +116,6 @@ class Q1Core:
 
         duration = time.perf_counter() - start
         logger.info(f'Duration {duration*1000:5.1f} ms {cntr} instructions, {duration/cntr*1e6:4.1f} us/instr')
-
 
     def _print_error_msg(self, msg, instr, cntr):
         last_line = self.lines[instr.text_line_nr]
@@ -133,7 +135,7 @@ class Q1Core:
             reg_nrs = range(64)
         for reg_nr in reg_nrs:
             value = self.R[reg_nr]
-            signed_value =  np.asarray(value).astype(np.int32)
+            signed_value = np.asarray(value).astype(np.int32)
             float_value = signed_value / 2**31
             print(f'R{reg_nr:02}: {value:08X} {signed_value:11}  ({float_value:9.6f})')
 
@@ -339,7 +341,8 @@ class CoreClock:
             # remove executed rt entries.
             while b[0] < core_time:
                 b.popleft()
-        except: pass
+        except Exception:
+            pass
 
         # q1core halts when buffer is full
         if len(b) >= 16:
