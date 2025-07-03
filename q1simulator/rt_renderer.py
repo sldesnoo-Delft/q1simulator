@@ -385,14 +385,10 @@ class Renderer:
         if time < 4:
             logger.error(f'{self.name}: wait_time ({time} ns) must be >= 4 ns')
             self._error('WAIT TIME < 4 ns')
+        if time > 65535:
+            logger.error(f'{self.name}: wait_time ({time} ns) must be < 65535 ns')
+            self._error('WAIT TIME > 65535 ns')
 
-        if time & 0x0003:
-            logger.error(f'{self.name}: wait time not aligned on '
-                         f'4 ns boundary: {time} ns (offset={time & 0x03} ns)')
-            self._error('TIME NOT ALIGNED')
-
-        # 16 bits, 4 ns resolution
-        time &= 0xFFFC
         t_start = self.time
         t_end = t_start + time
         self.time = t_end
@@ -613,7 +609,7 @@ class Renderer:
             t, out = data
             if isinstance(t, Number):
                 pt.plot(out, label=name)
-            elif len(name) > 4 and name[-3:-1] == '-M':
+            elif len(name) > 3 and name[-3:-1] == '-M':
                 # marker output
                 pt.plot(t, out, ":", label=name)
             else:
