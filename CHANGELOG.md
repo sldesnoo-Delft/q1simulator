@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.17.1] - 2025-07-03
+
+- Implemented 1 ns resolution.
+- Dropped support for qblox-instruments < 0.12.0
+
 ## \[0.17.0] - 2025-06-11
 
 - Update to qblox-instruments v0.17.0
