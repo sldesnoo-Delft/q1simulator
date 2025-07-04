@@ -390,7 +390,7 @@ class Renderer:
             self._error('WAIT TIME > 65535 ns')
 
         t_start = self.time
-        t_end = t_start + time
+        t_end = t_start + int(time)
         self.time = t_end
 
         # stop rendering when there is too much data
