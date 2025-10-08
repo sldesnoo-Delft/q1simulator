@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.18.0] - 2025-10-08
+
+- Updates for qblox-instruments v0.18.0
+- Added argument `as_numpy` in `get_acquisitions`.
+- Fix simulation runtime > 2^32 ns.
+
 ## \[0.17.1] - 2025-07-03
 
 - Implemented 1 ns resolution.

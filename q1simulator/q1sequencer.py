@@ -351,7 +351,7 @@ class Q1Sequencer(InstrumentChannel):
         self.q1core.run()
         self.run_state = 'STOPPED'
 
-    def get_acquisition_data(self):
+    def get_acquisition_data(self, as_numpy: bool = False):
         if not self._is_qrm:
             raise NotImplementedError('Instrument type is not QRM')
         cnt, data, thresholded = self.rt_renderer.get_acquisition_data()
@@ -361,17 +361,25 @@ class Q1Sequencer(InstrumentChannel):
             acq_count = cnt[index]
             path_data = data[index]/acq_count[:, None]
             threshold = thresholded[index]/acq_count
+            path0 = path_data[:, 0]
+            path1 = path_data[:, 1]
+
+            if not as_numpy:
+                acq_count = acq_count.tolist()
+                threshold = threshold.tolist()
+                path0 = path0.tolist()
+                path1 = path1.tolist()
 
             result[name] = {
                 'index': index,
                 'acquisition': {
                     'bins': {
                         'integration': {
-                            'path0': list(path_data[:, 0]),
-                            'path1': list(path_data[:, 1]),
+                            'path0': path0,
+                            'path1': path1,
                             },
                         'threshold': threshold,
-                        'avg_cnt': list(acq_count),
+                        'avg_cnt': acq_count,
                     }
                 }}
         return result

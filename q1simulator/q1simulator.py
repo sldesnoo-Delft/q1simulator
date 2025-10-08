@@ -220,8 +220,8 @@ class Q1Module(qc.instrument.InstrumentBase):
     def get_acquisition_status(self, seq_nr, timeout=0):
         return self.sequencers[seq_nr].get_acquisition_status()
 
-    def get_acquisitions(self, seq_nr, timeout=0):
-        return self.sequencers[seq_nr].get_acquisition_data()
+    def get_acquisitions(self, seq_nr: int, *, as_numpy: bool = False) -> dict:
+        return self.sequencers[seq_nr].get_acquisition_data(as_numpy=as_numpy)
 
     def delete_acquisition_data(self, seq_nr, name='', all=False):
         self.sequencers[seq_nr].delete_acquisition_data(name=name, all=all)
