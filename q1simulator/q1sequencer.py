@@ -49,6 +49,8 @@ class Q1Sequencer(InstrumentChannel):
         'connect_acq_Q',
         'nco_prop_delay_comp',
         'nco_prop_delay_comp_en',
+        'ttl_acq_threshold',
+        'ttl_acq_input_select',
         ]
     _seq_log_only_parameters_qrm_rf = [
         'connect_acq',
@@ -114,6 +116,7 @@ class Q1Sequencer(InstrumentChannel):
             self.add_parameter('thresholded_acq_trigger_en', set_cmd=self._set_thresholded_acq_trigger_en)
             self.add_parameter('thresholded_acq_trigger_address', set_cmd=self._set_thresholded_acq_trigger_address)
             self.add_parameter('thresholded_acq_trigger_invert', set_cmd=self._set_thresholded_acq_trigger_invert)
+            self.add_parameter('ttl_acq_auto_bin_incr_en', set_cmd=self._set_ttl_acq_auto_bin_incr_en)
 
         self._trace = False
         self.reset()
@@ -221,6 +224,9 @@ class Q1Sequencer(InstrumentChannel):
 
     def _set_thresholded_acq_trigger_invert(self, value):
         self.rt_renderer.set_thresholded_acq_trigger_invert(value)
+
+    def _set_ttl_acq_auto_bin_incr_en(self, value):
+        self.rt_renderer.set_ttl_acq_auto_bin_incr_en(value)
 
     def upload(self, sequence):
         if isinstance(sequence, dict):

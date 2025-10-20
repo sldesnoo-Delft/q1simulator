@@ -274,6 +274,12 @@ class Q1Core:
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire_weighed(bins, bin_index, weight0, weight1, wait_after)
 
+    def _acquire_ttl(self, bins, bin_index, enable, wait_after):
+        if not self._is_qrm:
+            raise NotImplementedError('instrument type is not QRM')
+        self.clock.schedule_rt(self.renderer.time)
+        self.renderer.acquire_ttl(bins, bin_index, enable, wait_after)
+
     def _set_latch_en(self, enable, wait_after):
         if enable not in [0, 1]:
             raise ValueError('enable must be 0 or 1')

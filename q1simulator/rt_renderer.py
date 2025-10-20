@@ -85,6 +85,7 @@ class Renderer:
         self.wavedict = {}
         self.acq_weights = {}
         self.acq_bins = {}
+        self.ttl_acq_auto_bin_incr_en = False
         self.output_selected_path = ['off'] * 4
         self.nco_frequency = 0.0
         self.mod_en_awg = False
@@ -118,6 +119,7 @@ class Renderer:
         self.acq_times = {i: [] for i in self.acq_bins}
         self.acq_buffer = AcqBuffer()
         self.acq_trigger_events = []
+        self.acq_ttl_start = None
         self.mock_data = {}
         self.errors = set()
         self.latch_enabled = False
@@ -178,6 +180,9 @@ class Renderer:
 
     def set_thresholded_acq_trigger_invert(self, value):
         self.acq_conf.trigger_invert = value
+
+    def set_ttl_acq_auto_bin_incr_en(self, value):
+        self.ttl_acq_auto_bin_incr_en = value
 
     def set_mrk(self, value):
         self.next_settings.marker = value
@@ -244,6 +249,29 @@ class Renderer:
                 len(self.acq_weights[weight1])
             )
             self._add_acquisition(bins, bin_index, duration)
+        self._render(wait_after)
+
+    @check_conditional
+    def acquire_ttl(self, bins, bin_index, enable, wait_after):
+        self._update_settings()
+        if self.trace_enabled:
+            self._trace(f'Acquire TTL {bins} {bin_index} {enable}')
+        if enable:
+            if self.acq_ttl_start is not None:
+                self._error("ACQ TTL already enabled")
+            self.acq_ttl_start = self.time
+            self.acq_ttl_bins = bins
+            self.act_ttl_bin_index = bin_index
+        else:
+            if self.acq_ttl_start is None:
+                self._error("ACQ TTL not enabled")
+            # FIXME: use mock data. Generate events when time is incremented in _reader.
+            # Use arguments from enable
+            self._add_acquisition_ttl(
+                self.acq_ttl_bins,
+                self.act_ttl_bin_index,
+                self.acq_ttl_start, self.time)
+            self.acq_ttl_start = None
         self._render(wait_after)
 
     @check_conditional
@@ -516,6 +544,39 @@ class Renderer:
                 trigger_state = self.acq_trigger_value
             # TODO also add to trigger events. Part of TriggerDistributor redesign.
             # FIXME: own trigger is not counted.
+            self.acq_trigger_events.append(TriggerEvent(acq_conf.trigger_addr, t_end, trigger_state))
+            self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
+
+    def _add_acquisition_ttl(self, bins, bin_index, start, stop):
+        if bins not in self.acq_bins:
+            self._error('ACQ INDEX INVALID')
+            return
+        self.acq_times[bins].append((start, bin_index))
+        if bin_index >= self.acq_bins[bins]:
+            self._error('ACQ BIN INDEX INVALID')
+            return
+        # FIXME: This is not correct. Every ttl trigger should be accounted.
+        if not self.acq_buffer.add(start):
+            self._error('ACQ BINNING FIFO ERROR')
+            return
+        # TODO: add mock data
+        # Just add 5 counts for every ttl acquisition
+        n = 5
+        bin_offset = 0
+        for i in range(n):
+            self.acq_count[bins][bin_index+bin_offset] += 1
+            # TODO set acq_data.
+            if self.ttl_acq_auto_bin_incr_en:
+                bin_offset += 1
+        acq_conf = self.acq_conf
+        if acq_conf.trigger_en:
+            t_end = stop
+            if self.acq_trigger_value is None:
+                # Always generate a trigger
+                trigger_state = True
+            else:
+                trigger_state = self.acq_trigger_value
+            # TODO: use mock data to generate multiple triggers in interval.
             self.acq_trigger_events.append(TriggerEvent(acq_conf.trigger_addr, t_end, trigger_state))
             self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
 

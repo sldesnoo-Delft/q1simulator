@@ -54,6 +54,7 @@ mnemonic_args = {
     "play": "UR,UR,U",
     "acquire": "U,UR,U",
     "acquire_weighed": "U,UR,UR,UR,U",
+    "acquire_ttl": "U,UR,U,U",
     "set_latch_en": "UR,U",
     "latch_rst": "UR",
     "wait": "UR",
