@@ -1,9 +1,10 @@
-import logging
-from functools import partial
-from dataclasses import dataclass
 import json
+import logging
+from dataclasses import dataclass
+from functools import partial
+from typing import Iterator, Iterable, Any
+
 import numpy as np
-from typing import Iterator, Iterable
 
 from qcodes.instrument.channel import InstrumentChannel
 
@@ -235,14 +236,55 @@ class Q1Sequencer(InstrumentChannel):
             filename = sequence
             with open(filename) as fp:
                 pdict = json.load(fp)
-        waveforms = pdict['waveforms']
-        weights = pdict['weights']
-        acquisitions = pdict['acquisitions']
         program = pdict['program']
-        self._set_waveforms(waveforms)
-        self._set_weights(weights)
-        self._set_acquisition_bins(acquisitions)
         self.q1core.load(program)
+        waveforms = pdict['waveforms']
+        self._set_waveforms(waveforms)
+        if self._is_qrm:
+            weights = pdict['weights']
+            acquisitions = pdict['acquisitions']
+            self._set_weights(weights)
+            self._set_acquisition_bins(acquisitions)
+
+    def update_sequence(self, erase_existing: bool = False, **sequence):
+        if "program" in sequence:
+            self.q1core.load(sequence["program"])
+
+        if erase_existing:
+            if "waveforms" in sequence:
+                self._set_waveforms(sequence["waveforms"])
+            if "weights" in sequence:
+                self._set_weights(sequence["weights"])
+            if "acquisitions" in sequence:
+                self._set_acquisition_bins(sequence["acquisitions"])
+        else:
+            if "waveforms" in sequence:
+                waveforms = self.waveforms
+                indices = {wvf["index"]: name for name, wvf in waveforms.items()}
+                for name, waveform in sequence["waveforms"].items():
+                    index = waveform["index"]
+                    if index in indices:
+                        del waveforms[indices[index]]
+                    waveforms[name] = waveform
+                self._set_waveforms(waveforms)
+            if "weights" in sequence:
+                weights = self.weights
+                indices = {weight["index"]: name for name, weight in weights.items()}
+                for name, weight in sequence["weights"].items():
+                    index = weight["index"]
+                    if index in indices:
+                        del weights[indices[index]]
+                    weights[name] = weight
+                self._set_weights(weights)
+            if "acquisitions" in sequence:
+                acquisition_bins = self.acquisition_bins
+                indices = {bins["index"]: name for name, bins in acquisition_bins.items()}
+                for name, bins in acquisition_bins["weights"].items():
+                    index = bins["index"]
+                    if index in indices:
+                        del acquisition_bins[indices[index]]
+                    acquisition_bins[name] = bins
+                self._set_acquisition_bins(acquisition_bins)
 
     def _set_waveforms(self, waveforms):
         self.waveforms = waveforms
