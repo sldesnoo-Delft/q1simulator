@@ -40,7 +40,7 @@ Repository = "https://github.com/sldesnoo-Delft/q1simulator"
 Changelog = "https://github.com/sldesnoo-Delft/q1simulator/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
-packages = ["q1simulator"]
+packages = ["q1simulator", "q1simulator.gui"]
 
 [tool.setuptools.package-data]
 q1simulator = ["*.hdf5"]
