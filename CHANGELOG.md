@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.18.1] - 2025-10-23
+
+- Added `acquire_ttl` and associated QCoDeS parameters.
+- Added `update_sequence` to sequencer.
+- Added scope acquisition.
+
 ## \[0.18.0] - 2025-10-08
 
 - Updates for qblox-instruments v0.18.0
