@@ -142,9 +142,10 @@ class Q1Sequencer(InstrumentChannel):
     def reset(self):
         self.waveforms = {}
         self.weights = {}
-        self.acquisition_bins = {}
+        self.acquisitions = {}
         self._mock_data = {}
         self._trigger_events = []
+        self._scope_data = {}
         self.run_state = 'IDLE'
         self.rt_renderer = Renderer(self.name)
         self.rt_renderer.trace_enabled = self._trace
@@ -244,7 +245,7 @@ class Q1Sequencer(InstrumentChannel):
             weights = pdict['weights']
             acquisitions = pdict['acquisitions']
             self._set_weights(weights)
-            self._set_acquisition_bins(acquisitions)
+            self._set_acquisitions(acquisitions)
 
     def update_sequence(self, erase_existing: bool = False, **sequence):
         if "program" in sequence:
@@ -256,7 +257,7 @@ class Q1Sequencer(InstrumentChannel):
             if "weights" in sequence:
                 self._set_weights(sequence["weights"])
             if "acquisitions" in sequence:
-                self._set_acquisition_bins(sequence["acquisitions"])
+                self._set_acquisitions(sequence["acquisitions"])
         else:
             if "waveforms" in sequence:
                 waveforms = self.waveforms
@@ -277,14 +278,14 @@ class Q1Sequencer(InstrumentChannel):
                     weights[name] = weight
                 self._set_weights(weights)
             if "acquisitions" in sequence:
-                acquisition_bins = self.acquisition_bins
-                indices = {bins["index"]: name for name, bins in acquisition_bins.items()}
-                for name, bins in acquisition_bins["weights"].items():
-                    index = bins["index"]
+                acquisitions = self.acquisitions
+                indices = {acq["index"]: name for name, acq in acquisitions.items()}
+                for name, acquisition in sequence["acquisitions"].items():
+                    index = acquisition["index"]
                     if index in indices:
-                        del acquisition_bins[indices[index]]
-                    acquisition_bins[name] = bins
-                self._set_acquisition_bins(acquisition_bins)
+                        del acquisitions[indices[index]]
+                    sequence[name] = acquisition
+                self._set_acquisitions(sequence)
 
     def _set_waveforms(self, waveforms):
         self.waveforms = waveforms
@@ -304,25 +305,25 @@ class Q1Sequencer(InstrumentChannel):
             weightsdict[index] = data
         self.rt_renderer.set_weights(weightsdict)
 
-    def _set_acquisition_bins(self, acq_bins):
-        self.acquisition_bins = acq_bins
-        bins_dict = {}
-        for name, datadict in acq_bins.items():
+    def _set_acquisitions(self, acquisitions):
+        self.acquisitions = acquisitions
+        acq_dict = {}
+        for name, datadict in acquisitions.items():
             index = int(datadict['index'])
             num_bins = int(datadict['num_bins'])
-            bins_dict[index] = num_bins
-        self.rt_renderer.set_acquisition_bins(bins_dict)
+            acq_dict[index] = num_bins
+        self.rt_renderer.set_acquisitions(acq_dict)
 
     def _set_rt_mock_data(self):
         for name, md in self._mock_data.items():
-            if name not in self.acquisition_bins:
-                logger.warning(f"no acquisition_bins for mock_data '{name}'")
+            if name not in self.acquisitions:
+                logger.warning(f"no acquisition for mock_data '{name}'")
                 continue
             try:
                 data = np.asarray(next(md))
             except StopIteration:
                 raise Exception('No more mock data')
-            bin_num = int(self.acquisition_bins[name]['index'])
+            bin_num = int(self.acquisitions[name]['index'])
             self.rt_renderer.set_mock_data(bin_num, data)
 
     if qblox_version < Version('0.14'):
@@ -404,7 +405,7 @@ class Q1Sequencer(InstrumentChannel):
             raise NotImplementedError('Instrument type is not QRM')
         cnt, data, thresholded = self.rt_renderer.get_acquisition_data()
         result = {}
-        for name, datadict in self.acquisition_bins.items():
+        for name, datadict in self.acquisitions.items():
             index = int(datadict['index'])
             acq_count = cnt[index]
             path_data = data[index]/acq_count[:, None]
@@ -430,14 +431,36 @@ class Q1Sequencer(InstrumentChannel):
                         'avg_cnt': acq_count,
                     }
                 }}
+            if name in self._scope_data:
+                scope_data = self._scope_data[name]
+                result[name]['acquisition']["scope"] = {
+                    'path0': {
+                        'data': scope_data['path0'],
+                        'avg_cnt': scope_data['avg_cnt'],
+                        },
+                    'path1': {
+                        'data': scope_data['path1'],
+                        'avg_cnt': scope_data['avg_cnt'],
+                        },
+                    }
         return result
 
     def delete_acquisition_data(self, name='', all=False):
         if all:
             self.rt_renderer.delete_acquisition_data_all()
+            self._scope_data = {}
         else:
-            index = self.acquisition_bins[name]['index']
+            index = self.acquisitions[name]['index']
             self.rt_renderer.delete_acquisition_data(index)
+            if name in self._scope_data:
+                del self._scope_data[name]
+
+    def store_scope_acquisition(self, acq_name):
+        self._scope_data[acq_name] = {
+            "path0": np.cos(np.arange(131072)/1000*2*np.pi),
+            "path1": np.sin(np.arange(131072)/1000*2*np.pi),
+            "avg_cnt": 1,
+            }
 
     # --- Simulator specific methods ---
 

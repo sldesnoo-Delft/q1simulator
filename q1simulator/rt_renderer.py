@@ -84,7 +84,7 @@ class Renderer:
         self.wavedict_float = {}
         self.wavedict = {}
         self.acq_weights = {}
-        self.acq_bins = {}
+        self.acquisitions = {}
         self.ttl_acq_auto_bin_incr_en = False
         self.output_selected_path = ['off'] * 4
         self.nco_frequency = 0.0
@@ -116,7 +116,7 @@ class Renderer:
         self.out0 = []
         self.out1 = []
         self.marker_out = [list() for _ in range(4)]  # a list per marker
-        self.acq_times = {i: [] for i in self.acq_bins}
+        self.acq_times = {i: [] for i in self.acquisitions}
         self.acq_buffer = AcqBuffer()
         self.acq_trigger_events = []
         self.acq_ttl_start = None
@@ -147,8 +147,8 @@ class Renderer:
     def set_weights(self, weightsdict):
         self.acq_weights = weightsdict
 
-    def set_acquisition_bins(self, acq_bins):
-        self.acq_bins = acq_bins
+    def set_acquisitions(self, acquisitions):
+        self.acquisitions = acquisitions
         self.delete_acquisition_data_all()
 
     def set_trigger_count_threshold(self, addr, count):
@@ -227,18 +227,18 @@ class Renderer:
         self._render(wait_after)
 
     @check_conditional
-    def acquire(self, bins, bin_index, wait_after):
+    def acquire(self, acq_index, bin_index, wait_after):
         self._update_settings()
         if self.trace_enabled:
-            self._trace(f'Acquire {bins} {bin_index} ({self.acq_conf.length} ns)')
-        self._add_acquisition(bins, bin_index, self.acq_conf.length)
+            self._trace(f'Acquire {acq_index} {bin_index} ({self.acq_conf.length} ns)')
+        self._add_acquisition(acq_index, bin_index, self.acq_conf.length)
         self._render(wait_after)
 
     @check_conditional
-    def acquire_weighed(self, bins, bin_index, weight0, weight1, wait_after):
+    def acquire_weighed(self, acq_index, bin_index, weight0, weight1, wait_after):
         self._update_settings()
         if self.trace_enabled:
-            self._trace(f'AcquireWeighed {bins} {bin_index} {weight0} {weight1}')
+            self._trace(f'AcquireWeighed {acq_index} {bin_index} {weight0} {weight1}')
         if weight0 not in self.acq_weights:
             self._error('ACQ WEIGHT PLAYBACK INDEX INVALID PATH 0')
         elif weight1 not in self.acq_weights:
@@ -248,19 +248,19 @@ class Renderer:
                 len(self.acq_weights[weight0]),
                 len(self.acq_weights[weight1])
             )
-            self._add_acquisition(bins, bin_index, duration)
+            self._add_acquisition(acq_index, bin_index, duration)
         self._render(wait_after)
 
     @check_conditional
-    def acquire_ttl(self, bins, bin_index, enable, wait_after):
+    def acquire_ttl(self, acq_index, bin_index, enable, wait_after):
         self._update_settings()
         if self.trace_enabled:
-            self._trace(f'Acquire TTL {bins} {bin_index} {enable}')
+            self._trace(f'Acquire TTL {acq_index} {bin_index} {enable}')
         if enable:
             if self.acq_ttl_start is not None:
                 self._error("ACQ TTL already enabled")
             self.acq_ttl_start = self.time
-            self.acq_ttl_bins = bins
+            self.acq_ttl_acq_index = acq_index
             self.act_ttl_bin_index = bin_index
         else:
             if self.acq_ttl_start is None:
@@ -268,7 +268,7 @@ class Renderer:
             # FIXME: use mock data. Generate events when time is incremented in _reader.
             # Use arguments from enable
             self._add_acquisition_ttl(
-                self.acq_ttl_bins,
+                self.acq_ttl_acq_index,
                 self.act_ttl_bin_index,
                 self.acq_ttl_start, self.time)
             self.acq_ttl_start = None
@@ -478,8 +478,8 @@ class Renderer:
                 self.latch_regs[index] += trigger.state
                 self._trace(f'Latch reg {index} {trigger.state:+d} -> {self.latch_regs[index]}')
 
-    def _get_acq_data(self, bins, default):
-        mock_data_iter = self.mock_data.get(bins, None)
+    def _get_acq_data(self, acq_index, default):
+        mock_data_iter = self.mock_data.get(acq_index, None)
         if mock_data_iter is None:
             return (default, default)
         else:
@@ -500,41 +500,41 @@ class Renderer:
         self.acq_count = {}
         self.acq_data = {}
         self.acq_thresholded = {}
-        for index in self.acq_bins:
+        for index in self.acquisitions:
             self.delete_acquisition_data(index)
 
     def delete_acquisition_data(self, index):
-        num_bins = self.acq_bins[index]
+        num_bins = self.acquisitions[index]
         self.acq_count[index] = np.zeros(num_bins, dtype=int)
         self.acq_data[index] = np.full((num_bins, 2), np.nan)
         self.acq_thresholded[index] = np.full(num_bins, np.nan)
 
-    def _add_acquisition(self, bins, bin_index, duration):
+    def _add_acquisition(self, acq_index, bin_index, duration):
         t = self.time
-        if bins not in self.acq_bins:
+        if acq_index not in self.acquisitions:
             self._error('ACQ INDEX INVALID')
             return
-        self.acq_times[bins].append((t, bin_index))
-        if bin_index >= self.acq_bins[bins]:
+        self.acq_times[acq_index].append((t, bin_index))
+        if bin_index >= self.acquisitions[acq_index]:
             self._error('ACQ BIN INDEX INVALID')
             return
         if not self.acq_buffer.add(t):
             self._error('ACQ BINNING FIFO ERROR')
             return
         acq_conf = self.acq_conf
-        value = self._get_acq_data(bins, t/1e6)
+        value = self._get_acq_data(acq_index, t/1e6)
         angle = acq_conf.rotation/180*np.pi
         rot_value = value[0]*np.cos(angle) + value[1]*np.sin(angle)
         state = rot_value >= acq_conf.threshold
         self._trace(f'Acq result {state}, {rot_value}, {acq_conf.threshold}')
 
-        if self.acq_count[bins][bin_index] == 0:
-            self.acq_data[bins][bin_index] = value
-            self.acq_thresholded[bins][bin_index] = state
+        if self.acq_count[acq_index][bin_index] == 0:
+            self.acq_data[acq_index][bin_index] = value
+            self.acq_thresholded[acq_index][bin_index] = state
         else:
-            self.acq_data[bins][bin_index] += value
-            self.acq_thresholded[bins][bin_index] += state
-        self.acq_count[bins][bin_index] += 1
+            self.acq_data[acq_index][bin_index] += value
+            self.acq_thresholded[acq_index][bin_index] += state
+        self.acq_count[acq_index][bin_index] += 1
 
         if acq_conf.trigger_en:
             t_end = t + duration
@@ -547,12 +547,12 @@ class Renderer:
             self.acq_trigger_events.append(TriggerEvent(acq_conf.trigger_addr, t_end, trigger_state))
             self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
 
-    def _add_acquisition_ttl(self, bins, bin_index, start, stop):
-        if bins not in self.acq_bins:
+    def _add_acquisition_ttl(self, acq_index, bin_index, start, stop):
+        if acq_index not in self.acquisitions:
             self._error('ACQ INDEX INVALID')
             return
-        self.acq_times[bins].append((start, bin_index))
-        if bin_index >= self.acq_bins[bins]:
+        self.acq_times[acq_index].append((start, bin_index))
+        if bin_index >= self.acquisitions[acq_index]:
             self._error('ACQ BIN INDEX INVALID')
             return
         # FIXME: This is not correct. Every ttl trigger should be accounted.
@@ -564,7 +564,7 @@ class Renderer:
         n = 5
         bin_offset = 0
         for i in range(n):
-            self.acq_count[bins][bin_index+bin_offset] += 1
+            self.acq_count[acq_index][bin_index+bin_offset] += 1
             # TODO set acq_data.
             if self.ttl_acq_auto_bin_incr_en:
                 bin_offset += 1
@@ -684,8 +684,8 @@ class Renderer:
         if limits:
             pt.xlim(**limits)
 
-    def set_mock_data(self, bins, data: Iterable[Sequence[float]]):
-        self.mock_data[bins] = iter(data)
+    def set_mock_data(self, acq_index, data: Iterable[Sequence[float]]):
+        self.mock_data[acq_index] = iter(data)
 
     def get_acquisition_data(self):
         return (self.acq_count, self.acq_data, self.acq_thresholded)

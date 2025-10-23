@@ -226,6 +226,9 @@ class Q1Module(qc.instrument.InstrumentBase):
     def delete_acquisition_data(self, seq_nr, name='', all=False):
         self.sequencers[seq_nr].delete_acquisition_data(name=name, all=all)
 
+    def store_scope_acquisition(self, seq_nr: int, name: str):
+        self.sequencers[seq_nr].store_scope_acquisition(name)
+
     def start_adc_calib(self):
         if self._is_qrm:
             logger.info('Calibrate ADC')
