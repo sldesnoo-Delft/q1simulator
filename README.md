@@ -31,6 +31,7 @@ The parameters must explicitly be set.
 
 # Example
 
+```Python
     from q1simulator import Q1Simulator as Module
 
     sim = Module('q1sim', sim_type='QCM')
@@ -40,12 +41,14 @@ The parameters must explicitly be set.
     sim.get_sequencer_state(0)
     sim.plot()
     sim.print_acquisitions()
+```
 
 # Cluster
 
 A simulated Cluster can be created with the modules
 specified in a dictionary with  slot number and module type.
 
+```Python
     from q1simulator import Cluster
     modules = {
         2: "QCM",
@@ -59,28 +62,55 @@ specified in a dictionary with  slot number and module type.
 
     cluster.arm_sequencer()
     cluster.start_sequencer()
+```
+
+# Q1ProgramBrowser
+
+Programs with configuration can be saved using Q1Pulse's `save_program` from `Q1Instrument`,
+or setting `pulse_lib.qblox.QbloxConfig.store_programs=True` (for pulse-lib users).
+Every program is stored in a new subdirectory.
+
+```Python
+    from q1pulse import Q1Instrument
+
+    instrument = Q1Instrument(cluster)
+    ...
+    instrument.save_program("./stored_programs/program_xyz", program)
+```
+
+The saved programs can be browsed with `Q1ProgramBrowser`.
+The browser shows the programs found in the subdirectories.
+
+```Python
+    from q1simulator import Q1ProgramBrowser
+    Q1ProgramBrowser("./stored_programs")
+```
 
 # Q1Plotter
 
 Q1Plotter retrieves the settings from a cluster and runs a simulation of
 the program to plot the expected outputs.
 
+```Python
     from q1simulator import Q1Plotter
 
     plotter = Q1Plotter(my_cluster)
     plotter.plot()
-
+```
 **NOTE: Only sequencers with `sync_en()==True` are copy to the simulator and plotted. **
 
 # Q1ASM file viewer
 `plot_q1asm_file` is a simple function that reads a file
 and plots and prints the results.
+
+```Python
     from q1simulator import plot_q1asm_file
 
     path = 'demo_data'
     plot_q1asm_file(path + r'/q1seq_P1.json')
-
+```
 `plot_q1asm_files` does the same for multiple files.
+```Python
     from q1simulator import plot_q1asm_files, PlotDef
 
     path = 'demo_data'
@@ -90,7 +120,7 @@ and plots and prints the results.
             PlotDef(path + r'/q1seq_q1.json', 'q1', [2,3], lo_frequency=20e6),
             PlotDef(path + r'/q1seq_R1.json', 'R1', []),
             ])
-
+```
 See demo directory for some examples.
 
 The viewer can be executed from the commandline to view a single sequence file:
@@ -104,9 +134,10 @@ because 1 cycle take 1 to 6 us in the simulator. So, after
 10 to 60 seconds the simulator aborts execution of a sequencer.
 
 The limits can be changed:
+```Python
     sim.config('max_render_time', 10_000_000)
     sim.config('max_core_cycles', 1e9)
-
+```
 
 # Implemented methods
 Q1Simulator checks the installed version of qblox_instruments and mimics the
@@ -127,6 +158,7 @@ the simulator and mimic behavior of the cluster / module / sequencer:
 - get_acquisition_state
 - get_acquisitions
 - delete_acquisition_data
+- update_sequence
 
 Simulated sequencer qcodes parameters:
 - gain_awg_pathX
@@ -150,6 +182,7 @@ Simulated sequencer qcodes parameters:
 - thresholded_acq_trigger_en
 - thresholded_acq_trigger_address
 - thresholded_acq_trigger_invert
+- ttl_acq_auto_bin_incr_en
 
 All other methods and parameters only write the passed value to the logger.
 
@@ -173,7 +206,7 @@ The default behavior is to return the real-time timestamp of the
 acquire call.
 
 Example:
-
+```Python
     # set data for 1 run to return the values 0 till 19 on path 0 and path 1
     data = [np.arange(20)]
     sim.sequencers[0].set_acquisition_mock_data(data)
@@ -198,6 +231,7 @@ Example:
 
     # reset default behaviour.
     sim.sequencers[0].set_acquisition_mock_data(None)
+```
 
 # Conditional execution
 The simulator generates triggers according to the acquisition thresholds.
@@ -232,16 +266,16 @@ The options are:
 * F: format register value as Q1Pulse float
 
 Example:
-
+```
     #Q1Sim: log "t_wait",R3,TR
           wait  R3
     #Q1Sim: log "after",none,T
-
+```
 Output:
-
+```
     t_wait:          12 (0000000C) q1:   324 rt:   908 ns
     after:  q1:   332 rt:   920 ns
-
+```
 
 # About Q1Simulator
 One day after I had been working on the generation of Q1ASM I thought
