@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[0.18.2] - 2025-10-24
+
+- Fixed QRM-RF qcodes parameters.
+
 ## \[0.18.1] - 2025-10-23
 
 - Added `acquire_ttl` and associated QCoDeS parameters.

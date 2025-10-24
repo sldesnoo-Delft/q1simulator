@@ -110,7 +110,7 @@ class Q1Module(qc.instrument.InstrumentBase):
         elif sim_type == 'QRM':
             sim_params += self._sim_parameters_qrm
         elif sim_type == 'QRM-RF':
-            sim_params = self._sim_parameters_qrm_rf
+            sim_params += self._sim_parameters_qrm_rf
         elif sim_type == 'Viewer':
             sim_params += list(set(self._sim_parameters_qcm+self._sim_parameters_qrm))
 
