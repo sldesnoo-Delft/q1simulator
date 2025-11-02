@@ -4,45 +4,55 @@ Created on Sat Oct 22 19:04:38 2022
 
 @author: sdesnoo
 """
+import matplotlib.pyplot as plt
 from q1simulator import Cluster
 import qcodes as qc
 
+
 def init():
     qc.Instrument.close_all()
-    cluster = Cluster('test', {2:'QRM'})
+    cluster = Cluster('test', {2: 'QRM'})
     qrm = cluster.module2
     qrm.config('trace', True)
     return cluster
 
+
 def run(cluster, program, waveforms={}, weights={}, acquisitions={}):
 
     qrm = cluster.module2
+    qrm.config("trace", True)
     seq = qrm.sequencers[0]
+    seq.sync_en(True)
+    seq.mod_en_awg(True)
+    seq.connect_out0("I")
+    seq.connect_out1("Q")
     seq.channel_map_path0_out0_en = True
     seq.thresholded_acq_trigger_en(True)
     seq.thresholded_acq_trigger_address(1)
     seq.trigger1_count_threshold(1)
     seq.upload({
-            'program': program,
-            'waveforms': waveforms,
-            'weights': weights,
-            'acquisitions': acquisitions})
+        'program': program,
+        'waveforms': waveforms,
+        'weights': weights,
+        'acquisitions': acquisitions})
     qrm.arm_sequencer(0)
 
-    for seq_number,trigger_number in [(1, 2), (2,3)]:
+    for seq_number, trigger_number in [(1, 2), (2, 3)]:
         seq = qrm.sequencers[seq_number]
+        seq.sync_en(True)
         seq.thresholded_acq_trigger_en(True)
         seq.thresholded_acq_trigger_address(trigger_number)
         seq.upload({
-                'program': 'stop',
-                'waveforms': {},
-                'weights': {},
-                'acquisitions': {}
-                })
+            'program': 'stop',
+            'waveforms': {},
+            'weights': {},
+            'acquisitions': {}
+        })
         qrm.arm_sequencer(seq_number)
 
     cluster.start_sequencer()
     qrm.plot()
+
 
 waveforms = {
     "gauss80": {
@@ -68,18 +78,18 @@ waveforms = {
             0.003245379444956216, 0.0022685919639534573, 0.0015686819551156438, 0.0010730031959653244,
             0.0007260302794298448, 0.000485954999850973, 0.00032175475915178565, 0.00021073734644620426],
         "index": 0
-        },
+    },
     "zero80": {
         "data": [0.0]*80,
         "index": 1
-        },
-    }
+    },
+}
 
 sim = init()
 
-#%%
+# %%
 sim.reset()
-program='''
+program = '''
 wait_sync 100
 set_latch_en 1,4
 #Q1Sim:sim_trigger 1, 1
@@ -103,9 +113,12 @@ stop
 run(sim, program, waveforms)
 
 print('====')
-
-program='''
+# %%
+plt.figure()
+program = '''
 wait_sync 100
+set_awg_gain 32000,32000
+reset_ph
 set_latch_en 1,4
 #Q1Sim:sim_trigger 1, 1
 play 0,0,84 # subtract 16ns: total of else_wait of if/elif conditionals (final else not included)
@@ -117,6 +130,7 @@ play 0,1,68 # subtract 12 ns: total of else of next conditionals
 
 set_cond 1, 2, 0, 4
 wait 8 # wait 8 ns: # total else_wait of if/elif conditionals - total else_wait previous conditionals
+set_ph 500000000
 play 1,0,76 # subtract 4 ns for else of next conditional
 # duration of else: 8 ns
 
@@ -131,3 +145,4 @@ stop
 '''
 
 run(sim, program, waveforms)
+plt.legend()
