@@ -1,12 +1,10 @@
 from numbers import Number
-from packaging.version import Version
 from typing import Any
 
 import pyqtgraph as pg
 from qtpy import QtWidgets
 
 from q1simulator import Q1Simulator
-from q1simulator.qblox_version import qblox_version
 
 
 # default colors cycle: see matplotlib CN colors.
