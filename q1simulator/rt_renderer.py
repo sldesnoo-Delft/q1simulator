@@ -65,15 +65,18 @@ def _i16(value):
     return np.int32(value).astype(np.int16)
 
 
-def check_conditional(func):
-    @wraps(func)
-    def func_wrapper(self, *args, **kwargs):
-        if self.skip_rt:
-            self._else_wait()
-        else:
-            func(self, *args, **kwargs)
-
-    return func_wrapper
+def check_conditional(clear_latched_settings=False):
+    def _check_conditional(func):
+        @wraps(func)
+        def func_wrapper(self, *args, **kwargs):
+            if self.skip_rt:
+                if clear_latched_settings:
+                    self._clear_latched_settings()
+                self._else_wait()
+            else:
+                func(self, *args, **kwargs)
+        return func_wrapper
+    return _check_conditional
 
 
 class Renderer:
@@ -205,12 +208,12 @@ class Renderer:
     def set_awg_offs(self, offset0, offset1):
         self.next_settings.awg_offs[:] = offset0, offset1
 
-    @check_conditional
+    @check_conditional(clear_latched_settings=True)
     def upd_param(self, wait_after):
         self._update_settings()
         self._render(wait_after)
 
-    @check_conditional
+    @check_conditional(clear_latched_settings=True)
     def play(self, wave0, wave1, wait_after):
         self._update_settings()
         if self.trace_enabled:
@@ -226,7 +229,7 @@ class Renderer:
                               self.time + len(self.waves[1]))
         self._render(wait_after)
 
-    @check_conditional
+    @check_conditional(clear_latched_settings=True)
     def acquire(self, acq_index, bin_index, wait_after):
         self._update_settings()
         if self.trace_enabled:
@@ -234,7 +237,7 @@ class Renderer:
         self._add_acquisition(acq_index, bin_index, self.acq_conf.length)
         self._render(wait_after)
 
-    @check_conditional
+    @check_conditional(clear_latched_settings=True)
     def acquire_weighed(self, acq_index, bin_index, weight0, weight1, wait_after):
         self._update_settings()
         if self.trace_enabled:
@@ -251,7 +254,7 @@ class Renderer:
             self._add_acquisition(acq_index, bin_index, duration)
         self._render(wait_after)
 
-    @check_conditional
+    @check_conditional(clear_latched_settings=True)
     def acquire_ttl(self, acq_index, bin_index, enable, wait_after):
         self._update_settings()
         if self.trace_enabled:
@@ -274,7 +277,7 @@ class Renderer:
             self.acq_ttl_start = None
         self._render(wait_after)
 
-    @check_conditional
+    @check_conditional()
     def wait(self, time):
         if self.trace_enabled:
             self._trace(f'Wait {time}')
@@ -395,6 +398,13 @@ class Renderer:
             self._render_marker(old.marker, new.marker)
         # copy marker, offset and gain
         self.settings = deepcopy(self.next_settings)
+
+    def _clear_latched_settings(self):
+        pending = self.next_settings
+        pending.reset_phase = False
+        pending.phase_shift = 0.0
+        pending.relative_phase = None
+        pending.frequency = None
 
     def _render_marker(self, old_marker, new_marker):
         for i in range(4):
