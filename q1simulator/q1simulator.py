@@ -6,7 +6,7 @@ import matplotlib.pyplot as pt
 import qcodes as qc
 
 from .q1sequencer import Q1Sequencer
-from .qblox_version import check_qblox_instrument_version, qblox_version, Version
+from .qblox_version import check_qblox_instrument_version
 from .triggers import TriggerDistributor
 from .trigger_sorting import get_seq_trigger_info, sort_sequencers
 
@@ -14,9 +14,6 @@ from qblox_instruments import (
         InstrumentClass, InstrumentType,
         SystemStatuses, SystemStatus, SystemStatusSlotFlags,
         )
-
-if qblox_version < Version('0.14'):
-    from qblox_instruments import SystemState, SystemStatusOld
 
 
 logger = logging.getLogger(__name__)
@@ -206,14 +203,6 @@ class Q1Module(qc.instrument.InstrumentBase):
     def stop_sequencer(self, sequencer: int | None = None):
         self.armed_seq = set()
 
-    # Deprecated API
-    if qblox_version < Version('0.14'):
-        def get_sequencer_state(self, seq_nr, timeout=0):
-            return self.sequencers[seq_nr].get_state()
-
-        def get_acquisition_state(self, seq_nr, timeout=0):
-            return self.sequencers[seq_nr].get_acquisition_state()
-
     def get_sequencer_status(self, seq_nr, timeout=0):
         return self.sequencers[seq_nr].get_status()
 
@@ -357,14 +346,6 @@ class Q1Simulator(qc.Instrument, Q1Module):
             SystemStatuses.OKAY,
             [],
             SystemStatusSlotFlags({}))
-
-    if qblox_version < Version('0.14'):
-        # Deprecated API
-        def get_system_state(self):
-            return SystemState(
-                SystemStatusOld.OKAY,
-                [],
-                SystemStatusSlotFlags({}))
 
     def start_sequencer(self, sequencer: int | None = None):
         if sequencer is not None:

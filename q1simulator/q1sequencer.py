@@ -2,13 +2,11 @@ import json
 import logging
 from dataclasses import dataclass
 from functools import partial
-from typing import Iterator, Iterable, Any
+from typing import Iterator, Iterable
 
 import numpy as np
 
 from qcodes.instrument.channel import InstrumentChannel
-
-from .qblox_version import qblox_version, Version
 
 from qblox_instruments import (
     SequencerStatus,
@@ -16,8 +14,6 @@ from qblox_instruments import (
     SequencerStatusFlags,
     SequencerStates,
     )
-if qblox_version < Version('0.14'):
-    from qblox_instruments import SequencerStatusOld, SequencerState
 
 
 from .q1core import Q1Core
@@ -325,27 +321,6 @@ class Q1Sequencer(InstrumentChannel):
                 raise Exception('No more mock data')
             bin_num = int(self.acquisitions[name]['index'])
             self.rt_renderer.set_mock_data(bin_num, data)
-
-    if qblox_version < Version('0.14'):
-        # deprecated Old version
-        def get_state(self):
-            flags = [
-                SequencerStatusFlags[flag.replace(' ', '_')]
-                for flag in self.q1core.errors | self.rt_renderer.errors
-                ]
-            if self._is_qrm:
-                flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
-            return SequencerState(
-                SequencerStatusOld[self.run_state],
-                flags,
-            )
-
-    if qblox_version < Version('0.14'):
-        # deprecated Old version
-        def get_acquisition_state(self):
-            if not self._is_qrm:
-                raise NotImplementedError('Instrument type is not QRM')
-            return True
 
     def get_status(self):
         info_flags = []

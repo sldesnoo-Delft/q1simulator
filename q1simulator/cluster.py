@@ -9,11 +9,8 @@ from qblox_instruments import (
         SystemStatuses, SystemStatus, SystemStatusSlotFlags,
         )
 
-from .qblox_version import check_qblox_instrument_version, qblox_version, Version
+from .qblox_version import check_qblox_instrument_version
 from .q1simulator import Q1Module, run_sequencers
-
-if qblox_version < Version('0.14'):
-    from qblox_instruments import SystemState, SystemStatusOld
 
 
 logger = logging.getLogger(__name__)
@@ -97,14 +94,6 @@ class Cluster(qc.Instrument):
             [],
             SystemStatusSlotFlags({}))
 
-    # Support deprecated API
-    if qblox_version < Version('0.14'):
-        def get_system_state(self):
-            return SystemState(
-                SystemStatusOld.OKAY,
-                [],
-                SystemStatusSlotFlags({}))
-
     def get_connected_modules(self, filter_fn=None):
         result = {}
         for slot, module in self._modules.items():
@@ -118,14 +107,6 @@ class Cluster(qc.Instrument):
 
     def _set(self, name, value):
         logger.info(f'{self.name}:{name}={value}')
-
-    # Support deprecated API
-    if qblox_version < Version('0.14'):
-        def get_sequencer_state(self, slot, seq_nr, timeout=0):
-            return self._modules[slot].get_sequencer_state(seq_nr, timeout)
-
-        def get_acquisition_state(self, slot, seq_nr, timeout=0):
-            return self.self._modules[slot].get_acquisition_state(seq_nr, timeout)
 
     def get_sequencer_status(self, slot, seq_nr, timeout=0):
         return self._modules[slot].get_sequencer_status(seq_nr, timeout)

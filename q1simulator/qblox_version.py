@@ -4,8 +4,8 @@ from q1simulator import __version__ as q1simulator_version
 
 
 def check_qblox_instrument_version():
-    min_version = "0.12.0"
-    max_version = "0.18.0"
+    min_version = "0.14.0"
+    max_version = "1.0.0"
     if qblox_version < Version(min_version):
         raise Exception(f'Q1Simulator {q1simulator_version} requires qblox_instruments v{min_version}+')
     if qblox_version > Version(max_version):
