@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as pt
 import qcodes as qc
 
+from .channel_data import MarkerOutput, SampledOutput
 from .q1sequencer import Q1Sequencer
 from .qblox_version import check_qblox_instrument_version
 from .triggers import TriggerDistributor
@@ -240,16 +241,35 @@ class Q1Module(qc.instrument.InstrumentBase):
              channels: list[str] | list[int] | None = None,
              analogue_filter: bool = False,
              analogue_output_frequency: float = 4e9,
+             output_per_sequencer: bool = True,
              **kwargs):
-        for i, seq in enumerate(self.sequencers):
-            if channels is not None and i not in channels and seq.label not in channels:
-                # skip channel
-                continue
-            # assume only sequencers in sync mode have executed.
-            if seq.sync_en():
-                seq.plot(t_min=t_min, t_max=t_max,
-                         analogue_filter=analogue_filter,
-                         analogue_output_frequency=analogue_output_frequency)
+
+        output = self.get_output(t_min, t_max, channels,
+                                 analogue_filter, analogue_output_frequency,
+                                 output_per_sequencer)
+        for name, data in output.items():
+            if output_per_sequencer:
+                is_marker = len(name) > 3 and name[-3:-1] == '-M'
+            else:
+                is_marker = name[0] == "M"
+            linestyle = ":" if is_marker else "-"
+            if isinstance(data, MarkerOutput):
+                x, y = data.get_xy_lines()
+                pt.plot(x, y, linestyle, label=name)
+            elif isinstance(data, SampledOutput):
+                if data.sample_rate == 1:
+                    pt.plot(data.data, linestyle, label=name)
+                else:
+                    t = data.get_time_data()
+                    pt.plot(t, data.data, linestyle, label=name)
+
+        limits = {}
+        if t_min is not None:
+            limits['left'] = t_min
+        if t_max is not None:
+            limits['right'] = t_max
+        if limits:
+            pt.xlim(**limits)
 
     def get_output(self,
                    t_min: float = None,
@@ -257,6 +277,7 @@ class Q1Module(qc.instrument.InstrumentBase):
                    channels: list[str] | list[int] | None = None,
                    analogue_filter: bool = False,
                    output_frequency: float = 4e9,
+                   output_per_sequencer: bool = True,
                    ):
         output = {}
         for i, seq in enumerate(self.sequencers):
@@ -264,13 +285,39 @@ class Q1Module(qc.instrument.InstrumentBase):
                 # skip channel
                 continue
             # assume only sequencers in sync mode have executed.
-            if seq.sync_en():
-                # sequencer may generate output on muliple outputs (I, Q, marker)
-                seq_output = seq.get_output(t_min=t_min, t_max=t_max,
-                                            analogue_filter=analogue_filter,
-                                            output_frequency=output_frequency)
-                output.update(seq_output)
-
+            if not seq.sync_en():
+                continue
+            # sequencer may generate output on muliple outputs (I, Q, marker)
+            seq_output = seq.get_output(t_min=t_min, t_max=t_max,
+                                        analogue_filter=analogue_filter,
+                                        output_frequency=output_frequency)
+            if output_per_sequencer:
+                label = seq.label
+                iq_output = seq.get_enabled_outputs() == "IQ"
+                for path, data in seq_output.items():
+                    if path[0] in "IQ" and not iq_output:
+                        output[label] = data
+                    else:
+                        output[label+"-"+path] = data
+            else:
+                for i, path in enumerate(seq.output_selected_path):
+                    if path == "off":
+                        continue
+                    out = f"O{i+1}"
+                    data = seq_output[path]
+                    if out in output:
+                        output[out] += data
+                    else:
+                        output[out] = data
+                for i in range(4):
+                    marker = f"M{i+1}"
+                    if marker not in seq_output:
+                        continue
+                    data = seq_output[marker]
+                    if marker in output:
+                        output[marker] += data
+                    else:
+                        output[marker] = data
         return output
 
     def print_acquisitions(self):
@@ -367,6 +414,7 @@ class Q1Simulator(qc.Instrument, Q1Module):
              channels: list[str] | list[int] | None = None,
              analogue_filter: bool = False,
              analogue_output_frequency: float = 4e9,
+             output_per_sequencer: bool = True,
              **kwargs):
         """Plots the simulated output of the module.
 
@@ -375,11 +423,16 @@ class Q1Simulator(qc.Instrument, Q1Module):
             t_max: maximum time in the plot.
             channels: If not None specifies the channels to plot by name or sequencer number.
             analogue_filter: plot result after applying (estimated) analog filter.
+            analogue_output_frequency: sample rate of analogue output
+            output_per_sequencer:
+                if True: plot data for individual sequencers.
+                if False: plot data for physical front panel output.
         """
         pt.figure()
         super().plot(t_min=t_min, t_max=t_max, channels=channels,
                      analogue_filter=analogue_filter,
-                     analogue_output_frequency=analogue_output_frequency)
+                     analogue_output_frequency=analogue_output_frequency,
+                     output_per_sequencer=output_per_sequencer)
         pt.grid(True)
         pt.legend()
         pt.xlabel('[ns]')

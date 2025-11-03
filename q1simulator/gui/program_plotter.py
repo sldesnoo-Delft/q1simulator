@@ -5,6 +5,7 @@ import pyqtgraph as pg
 from qtpy import QtWidgets
 
 from q1simulator import Q1Simulator
+from q1simulator.channel_data import MarkerOutput, SampledOutput
 
 
 # default colors cycle: see matplotlib CN colors.
@@ -131,24 +132,29 @@ def plot_simulation(
                   f"errors: {[str(flag) for flag in status.err_flags]}, log: {status.log}")
 
     # plot
+    output_per_sequencer = True
     output = sim.get_output(
         t_min=min_time,
         t_max=max_time,
         analogue_filter=analogue_filter,
         output_frequency=analogue_output_frequency,
+        output_per_sequencer=output_per_sequencer,
         )
 
     pw = PlotWindow()
 
     for name, data in output.items():
-        t, out = data
-        if isinstance(t, Number):
-            pw.plot(out, label=name)
-        elif len(name) > 4 and name[-3:-1] == '-M':
-            # marker output
-            pw.plot(t, out, ":", label=name)
+        if output_per_sequencer:
+            is_marker = len(name) > 3 and name[-3:-1] == '-M'
         else:
-            pw.plot(t, out, label=name)
+            is_marker = name[0] == "M"
+        linestyle = ":" if is_marker else "-"
+        if isinstance(data, MarkerOutput):
+            x, y = data.get_xy_lines()
+            pw.plot(x, y, linestyle, label=name)
+        elif isinstance(data, SampledOutput):
+            t = data.get_time_data()
+            pw.plot(t, data.data, linestyle, label=name)
 
     # sim.print_acquisitions()
 

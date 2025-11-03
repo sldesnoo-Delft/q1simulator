@@ -8,6 +8,8 @@ class AnalogueFilter:
     warned = False
 
     def __init__(self, model_name: str, output_frequency: float = 4e9):
+        self.output_frequency = output_frequency
+
         if not AnalogueFilter.warned:
             print(f"WARNING: Analogue output of simulated {model_name} can differ "
                   "significantly from real hardware!")
@@ -45,3 +47,10 @@ class AnalogueFilter:
 
         d = np.convolve(d, self.pulse_response)
         return t+analogue_shift, d[self.n_before: -self.n_after]
+
+    def apply_filter(self, samples):
+        """Apply filter to samples without quantizing or shifting time."""
+        d = np.zeros(len(samples)*self.sr)
+        d[::self.sr] = samples
+        d = np.convolve(d, self.pulse_response)
+        return d[self.n_before: -self.n_after]

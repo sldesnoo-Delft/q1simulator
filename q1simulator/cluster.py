@@ -174,6 +174,7 @@ class Cluster(qc.Instrument):
              create_figure: bool | str = True,
              analogue_filter: bool = False,
              analogue_output_frequency: float = 4e9,
+             output_per_sequencer: bool = True,
              **kwargs):
         """Plots the simulated output of the cluster.
 
@@ -188,6 +189,9 @@ class Cluster(qc.Instrument):
                 If "modules" creates a new figure per module.
             analogue_filter: plot result after applying (estimated) analog filter.
             analogue_output_frequency: sample rate of analogue output
+            output_per_sequencer:
+                if True: plot data for individual sequencers.
+                if False: plot data for physical front panel output.
         """
         if create_figure is True:
             pt.figure()
@@ -206,6 +210,7 @@ class Cluster(qc.Instrument):
                 pt.xlabel('[ns]')
                 pt.ylabel('[V]')
             module.plot(t_min=t_min, t_max=t_max, channels=channels, analogue_filter=analogue_filter,
-                        analogue_output_frequency=analogue_output_frequency)
+                        analogue_output_frequency=analogue_output_frequency,
+                        output_per_sequencer=output_per_sequencer)
             pt.legend()
         pt.show()

@@ -140,6 +140,7 @@ class Q1Plotter:
              create_figure: bool | str = True,
              analogue_filter: bool = False,
              analogue_output_frequency: float = 4e9,
+             output_per_sequencer: bool = True,
              ):
         """Plots the simulated output of the cluster.
 
@@ -154,6 +155,9 @@ class Q1Plotter:
                 If "modules" creates a new figure per module.
             analogue_filter: plot result after applying (estimated) analog filter.
             analogue_output_frequency: sample rate of analogue output
+            output_per_sequencer:
+                if True: plot data for individual sequencers.
+                if False: plot data for physical front panel output.
         """
         end_time = self._simulator.get_simulation_end_time()
         if t_max is not None and t_max > self.max_render_time:
@@ -170,6 +174,7 @@ class Q1Plotter:
             create_figure=create_figure,
             analogue_filter=analogue_filter,
             analogue_output_frequency=analogue_output_frequency,
+            output_per_sequencer=output_per_sequencer,
             )
 
     @staticmethod

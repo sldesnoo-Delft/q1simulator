@@ -142,6 +142,8 @@ class Q1Sequencer(InstrumentChannel):
         self._mock_data = {}
         self._trigger_events = []
         self._scope_data = {}
+        self.output_selected_path = ['off'] * 4
+        self._paths_used = [False, False]
         self.run_state = 'IDLE'
         self.rt_renderer = Renderer(self.name)
         self.rt_renderer.trace_enabled = self._trace
@@ -185,19 +187,17 @@ class Q1Sequencer(InstrumentChannel):
         logger.debug(f'{self.name}: mixer_phase_offset_degree={value}')
         self.rt_renderer.mixer_phase_offset_degree = value
 
-    def _set_channel_map_path_en(self, path, out, enable):
-        logger.debug(f'{self.name}: channel_map_path{path}_out{out}_en={enable}')
-        if not enable:
-            value = 'off'
-        elif path == 0:
-            value = 'I'
-        else:
-            value = 'Q'
-        self.rt_renderer.connect_out(out, value)
-
     def _connect_out(self, out, value):
         logger.debug(f'{self.name}: _connect_out{out}={value}')
-        self.rt_renderer.connect_out(out, value)
+        self.output_selected_path[out] = value
+        paths_used = [False, False]
+        for value in self.output_selected_path:
+            if "I" in value:
+                paths_used[0] = True
+            if "Q" in value:
+                paths_used[1] = True
+        self._paths_used = paths_used
+        self.rt_renderer.enable_paths(self._paths_used)
 
     def _set_trigger_count_threshold(self, address, count):
         self.rt_renderer.set_trigger_count_threshold(address, count)
@@ -505,20 +505,17 @@ class Q1Sequencer(InstrumentChannel):
     def set_trigger_events(self, events):
         self._trigger_events = events
 
-    def plot(self, t_min=None, t_max=None, analogue_filter=False, analogue_output_frequency=4e9):
-        self.rt_renderer.plot(
-            self._v_max,
-            plot_label=self.label,
-            t_min=t_min,
-            t_max=t_max,
-            analogue_filter=analogue_filter,
-            analogue_output_frequency=analogue_output_frequency,
-            )
+    def get_enabled_outputs(self):
+        outputs = ""
+        if self._paths_used[0]:
+            outputs += "I"
+        if self._paths_used[1]:
+            outputs += "Q"
+        return outputs
 
     def get_output(self, t_min=None, t_max=None, analogue_filter=False, output_frequency=4e9):
         return self.rt_renderer.get_output(
             self._v_max,
-            plot_label=self.label,
             t_min=t_min,
             t_max=t_max,
             analogue_filter=analogue_filter,

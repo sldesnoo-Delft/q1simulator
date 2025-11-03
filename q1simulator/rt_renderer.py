@@ -7,11 +7,11 @@ from collections.abc import Sequence as AbcSequence
 from functools import wraps
 
 import numpy as np
-import matplotlib.pyplot as pt
 
+from .analogue_filter import AnalogueFilter
+from .channel_data import MarkerOutput, SampledOutput
 from .qblox_version import qblox_version, Version
 from .triggers import TriggerEvent
-from .analogue_filter import AnalogueFilter
 
 
 logger = logging.getLogger(__name__)
@@ -80,6 +80,7 @@ def check_conditional(clear_latched_settings=False):
 
 
 class Renderer:
+    _analogue_filter: AnalogueFilter | None = None
 
     def __init__(self, name):
         self.name = name
@@ -89,13 +90,13 @@ class Renderer:
         self.acq_weights = {}
         self.acquisitions = {}
         self.ttl_acq_auto_bin_incr_en = False
-        self.output_selected_path = ['off'] * 4
         self.nco_frequency = 0.0
         self.mod_en_awg = False
         self.mixer_gain_ratio = 1.0
         self.mixer_phase_offset_degree = 0.0
         self.delete_acquisition_data_all()
         self.next_settings = Settings()
+        self.enabled_paths = [False, False]
         self.reset()
         self.trace_enabled = False
         self.skip_wait_sync = True
@@ -137,8 +138,8 @@ class Renderer:
     def offset_awg_path(self, offset, path):
         self.next_settings.awg_offs[path] = offset
 
-    def connect_out(self, out, value):
-        self.output_selected_path[out] = value
+    def enable_paths(self, enabled_paths):
+        self.enabled_paths = enabled_paths
 
     def set_waveforms(self, wavedict):
         self.wavedict_float = wavedict
@@ -445,6 +446,8 @@ class Renderer:
         path[0] = s.awg_offs[0]
         path[1] = s.awg_offs[1]
 
+        # TODO only render if path active!
+
         for i in range(2):
             if self.waves_end[i] > t_start:
                 end = min(self.waves_end[i], t_end)
@@ -594,7 +597,7 @@ class Renderer:
         if self.trace_enabled:
             print(f'{self.time:-6} {msg}')
 
-    def get_output(self, v_max, plot_label, t_min=None, t_max=None,
+    def get_output(self, v_max, t_min=None, t_max=None,
                    analogue_filter=False, output_frequency=4e9):
         def time_window(out, t_min, t_max):
             if t_max is not None:
@@ -604,7 +607,10 @@ class Renderer:
             return out
 
         if analogue_filter:
-            _filter = AnalogueFilter("QCM", output_frequency=output_frequency)
+            _filter = self._get_analogue_filter(output_frequency)
+
+        if not any(self.enabled_paths):
+            return {}
 
         scaling = v_max/2**15
         t_end = self.time
@@ -613,86 +619,42 @@ class Renderer:
             t_end = self.max_render_time
             print(f'{self.name}: Rendering truncated at {max_ms:3.1f} ms. Total time: {self.time/1e6:4.1f} ms')
 
+        t_min = t_min if t_min is not None else 0
         t_max = min(t_max, t_end) if t_max is not None else t_end
-        if t_min is not None:
-            t = np.arange(t_min, t_max)
-        elif analogue_filter:
-            t = np.arange(0, t_max)
-        else:
-            # only pass 1 value instead of full array
-            t = t_max
-
-        n_ch_out = 0
-        for value in self.output_selected_path:
-            if value in ['I', 'Q']:
-                n_ch_out += 1
-            if value == 'IQ':
-                n_ch_out += 2
-        if n_ch_out == 0:
-            print(f'No outputs enabled for {plot_label}')
+        t_min = int(t_min + 0.5)
+        t_max = int(t_max + 0.5)
 
         output = {}
 
-        for i, value in enumerate(self.output_selected_path):
-            label = plot_label
-            if label == self.name:
-                label += f'.out{i}'
-            if value in ('I', 'IQ'):
-                if n_ch_out > 1:
-                    label += '-I'
-                out0 = scaling * np.concatenate(self.out0)
-                out0 = time_window(out0, t_min, t_max)
-                # print(f'Average V: {np.mean(out0)*1000:5.2f} mV')
-                if analogue_filter:
-                    ta, outa = _filter.get_awg_output(t, out0)
-                    output[label] = (ta, outa)
-                else:
-                    output[label] = (t, out0)
-            if value in ('Q', 'IQ'):
-                if n_ch_out > 1:
-                    label += '-Q'
-                out1 = scaling * np.concatenate(self.out1)
-                out1 = time_window(out1, t_min, t_max)
-                # print(f'Average V: {np.mean(out1)*1000:5.2f} mV')
-                if analogue_filter:
-                    ta, outa = _filter.get_awg_output(t, out1)
-                    output[label] = (ta, outa)
-                else:
-                    output[label] = (t, out1)
+        for i, enabled in enumerate(self.enabled_paths):
+            if not enabled:
+                continue
+            label = "IQ"[i]
+            out = [self.out0, self.out1][i]
+            out = scaling * np.concatenate(out)
+            out = time_window(out, t_min, t_max)
+            if analogue_filter:
+                sr = _filter.sr
+                out = _filter.apply_filter(out)
+            else:
+                sr = 1
+            output[label] = SampledOutput(t_min, t_max, sr, out)
 
         for i, m_list in enumerate(self.marker_out):
             if len(m_list) == 0:
                 continue
+            label = f'M{i+1}'
             points = [[0, 0]]
             points += m_list
             points.append([t_end, 0])
-            line = np.array(points).T
-            label = plot_label + f'-M{i}'
-            output[label] = (line[0], line[1])
+            output[label] = MarkerOutput(t_min, t_max, points)
         return output
 
-    def plot(self, v_max, plot_label, t_min=None, t_max=None, analogue_filter=False, analogue_output_frequency=4e9):
-        output = self.get_output(v_max, plot_label, t_min=t_min, t_max=t_max,
-                                 analogue_filter=analogue_filter,
-                                 output_frequency=analogue_output_frequency)
-
-        for name, data in output.items():
-            t, out = data
-            if isinstance(t, Number):
-                pt.plot(out, label=name)
-            elif len(name) > 3 and name[-3:-1] == '-M':
-                # marker output
-                pt.plot(t, out, ":", label=name)
-            else:
-                pt.plot(t, out, label=name)
-
-        limits = {}
-        if t_min is not None:
-            limits['left'] = t_min
-        if t_max is not None:
-            limits['right'] = t_max
-        if limits:
-            pt.xlim(**limits)
+    @classmethod
+    def _get_analogue_filter(cls, output_frequency):
+        if cls._analogue_filter is None or cls._analogue_filter.output_frequency != output_frequency:
+            cls._analogue_filter = AnalogueFilter("QCM", output_frequency=output_frequency)
+        return cls._analogue_filter
 
     def set_mock_data(self, acq_index, data: Iterable[Sequence[float]]):
         self.mock_data[acq_index] = iter(data)
