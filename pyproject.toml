@@ -8,11 +8,7 @@ version = "1.0.0" # tbump: version
 authors = [
   { name="Sander de Snoo", email="s.l.desnoo@tudelft.nl" },
 ]
-description = """
-Simulator for Q1ASM the assembly language of Qblox instruments.
-The simulator can execute the programs for QCM and QRM modules
-and plot the signals of the outputs.
-"""
+description = "Simulator for Qblox Q1ASM simulating QCM and QRM modules and plotting output."
 readme = "README.md"
 license = "MIT"
 license-files = [
