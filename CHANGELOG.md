@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.0.0] - 2025-11-03
+
+- Fixed clearing of pending settings for upd_param in conditional section (frequency and phase updates only!).
+- Update to qblox-instruments 1.0.0.
+- Dropped support for qblox-instruments < v0.14.0
+
 ## \[0.18.2] - 2025-10-24
 
 - Fixed QRM-RF qcodes parameters.
