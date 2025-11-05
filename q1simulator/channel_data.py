@@ -55,6 +55,10 @@ class MarkerOutput:
         points = self.points
         while points[ip][0] < self.t_min:
             ip += 1
+        if int(points[ip][1]) == int(points[ip+1][1]):
+            # Skip point if level doesn't change.
+            # This can occur at start: [[0, 0], [0, 0], [0, 1], ...]
+            ip += 1
         it = points[ip][0]
         data[:it] = points[ip][1]
         ip += 1
