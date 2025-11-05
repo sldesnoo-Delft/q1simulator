@@ -10,7 +10,6 @@ import numpy as np
 
 from .analogue_filter import AnalogueFilter
 from .channel_data import MarkerOutput, SampledOutput
-from .qblox_version import qblox_version, Version
 from .triggers import TriggerEvent
 
 
@@ -104,7 +103,6 @@ class Renderer:
         self.threshold_count = np.full(15, 0, dtype=np.uint16)
         self.threshold_invert = np.zeros(15, dtype=bool)
         self.acq_conf = AcqConf()
-        self.flip_phase_shift = qblox_version < Version("0.16")
 
     def reset(self):
         # start with the old settings / values set via qcodes.
@@ -457,8 +455,6 @@ class Renderer:
         if self.mod_en_awg:
             t = np.arange(t_start, t_end)
             phase_offset = self.relative_phase + self.delta_phase
-            if self.flip_phase_shift and self.nco_frequency < 0:
-                phase_offset = -phase_offset
             phase = 2*np.pi*(phase_offset + self.nco_phase_offset + self.nco_frequency * 1e-9 * t)
             nco = np.exp(1j*phase)
             # Multiplication factor as specified when modulating.
