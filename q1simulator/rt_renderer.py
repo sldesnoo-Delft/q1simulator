@@ -605,9 +605,6 @@ class Renderer:
         if analogue_filter:
             _filter = self._get_analogue_filter(output_frequency)
 
-        if not any(self.enabled_paths):
-            return {}
-
         scaling = v_max/2**15
         t_end = self.time
         if self.time > self.max_render_time:
