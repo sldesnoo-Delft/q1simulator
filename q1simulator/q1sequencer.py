@@ -280,8 +280,8 @@ class Q1Sequencer(InstrumentChannel):
                     index = acquisition["index"]
                     if index in indices:
                         del acquisitions[indices[index]]
-                    sequence[name] = acquisition
-                self._set_acquisitions(sequence)
+                    acquisitions[name] = acquisition
+                self._set_acquisitions(acquisitions)
 
     def _set_waveforms(self, waveforms):
         self.waveforms = waveforms
