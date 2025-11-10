@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.0.1] - 2025-11-10
+
+- Added option output_per_sequencer to Q1Simulator/Q1Module/Q1Cluster
+  to get output / plot data per sequencer or per output channel
+- Fixed bug in update_sequence for "acquisitions".
+- Fixed bug in plotting markers when sequencer has no active paths.
+- Dropped support for qblox-instruments < v0.16.0
+
 ## \[1.0.0] - 2025-11-03
 
 - Fixed clearing of pending settings for upd_param in conditional section (frequency and phase updates only!).
