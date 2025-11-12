@@ -39,11 +39,13 @@ class EmptySlot(qc.InstrumentChannel):
 
 
 class Cluster(qc.Instrument):
-    _cluster_parameters = [
-        'trigger_monitor_latest',
-        ]
     _log_only_params = [
         'led_brightness',
+        'reference_source',
+        'ext_trigger_input_delay',
+        'ext_trigger_input_trigger_en',
+        'ext_trigger_input_trigger_address',
+        'trigger_monitor_latest',
         ]
 
     def __init__(self, name, modules={}):
@@ -51,15 +53,12 @@ class Cluster(qc.Instrument):
         super().__init__(name)
 
         # TODO return trigger count
-        for par_name in self._cluster_parameters:
-            self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
         for i in range(1, 16):
             par_name = f'trigger{i}_monitor_count'
-            self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
+            self.add_parameter(par_name, set_cmd=partial(self._log_set, par_name))
 
         for par_name in self._log_only_params:
-            self.add_parameter(par_name,
-                               set_cmd=partial(self._log_set, par_name))
+            self.add_parameter(par_name, set_cmd=partial(self._log_set, par_name))
 
         self._modules = {}
         for slot in range(1, 21):
@@ -81,6 +80,15 @@ class Cluster(qc.Instrument):
     @property
     def instrument_type(self):
         return InstrumentType.MM
+
+    @property
+    def modules(self):
+        return list(self.submodules.values())
+
+    def reset(self):
+        self.invalidate_cache()
+        for module in self.get_connected_modules().values():
+            module.reset()
 
     def get_num_system_error(self):
         return 0
@@ -104,9 +112,6 @@ class Cluster(qc.Instrument):
     def _check_module_present(self, slot):
         if not self._modules[slot].present():
             raise Exception(f'No module in slot {slot}')
-
-    def _set(self, name, value):
-        logger.info(f'{self.name}:{name}={value}')
 
     def get_sequencer_status(self, slot, seq_nr, timeout=0):
         return self._modules[slot].get_sequencer_status(seq_nr, timeout)
@@ -133,7 +138,7 @@ class Cluster(qc.Instrument):
         # pass to sequence executor
         sequencers = []
         for module in modules:
-            seq_numbers = [sequencer] if sequencer is not None else module.armed_seq
+            seq_numbers = [sequencer] if sequencer is not None else module.armed_sequencers
             for seq_number in seq_numbers:
                 sequencers.append(module.sequencers[seq_number])
 
@@ -147,17 +152,34 @@ class Cluster(qc.Instrument):
             for module in self.get_connected_modules().values():
                 module.stop_sequencer(sequencer)
 
-    @property
-    def modules(self):
-        return list(self.submodules.values())
+    def get_waveforms(self, slot: int, sequencer: int, *, as_numpy: bool = False):
+        return self._modules[slot].get_waveforms(sequencer, as_numpy=as_numpy)
 
-    def reset(self):
-        self.invalidate_cache()
-        for module in self.get_connected_modules().values():
-            module.reset()
+    def get_weights(self, slot: int, sequencer: int, *, as_numpy: bool = False):
+        return self._modules[slot].get_weights(sequencer, as_numpy=as_numpy)
+
+    def store_scope_acquisition(self, slot: int, sequencer: int, name: str):
+        self._modules[slot].store_scope_acquisition(sequencer, name)
+
+    def get_acquisitions(self, slot: int, sequencer: int, *, as_numpy: bool = False) -> dict:
+        return self._modules[slot].get_acquisitions(sequencer, as_numpy=as_numpy)
+
+    def delete_acquisition_data(self, slot: int, sequencer: int, name: str = '', all=False):
+        return self._modules[slot].delete_acquisition_data(slot, name=name, all=all)
+
+    def connect_sequencer(self, slot: int, sequencer: int, *connections: str) -> None:
+        self._modules[slot].connect_sequencer(sequencer, *connections)
+
+    def disconnect_inputs(self, slot: int) -> None:
+        self._modules[slot].disconnect_inputs()
+
+    def disconnect_outputs(self, slot: int) -> None:
+        self._modules[slot].disconnect_outputs()
 
     def _log_set(self, name, value):
-        logger.info(f'{self.name}: {name}={value}')
+        logger.info(f"{self.name}: {name}={value}")
+
+    # ---- Simulator specific methods ----
 
     def config(self, name, value):
         for module in self.get_connected_modules().values():

@@ -12,9 +12,9 @@ from .triggers import TriggerDistributor
 from .trigger_sorting import get_seq_trigger_info, sort_sequencers
 
 from qblox_instruments import (
-        InstrumentClass, InstrumentType,
-        SystemStatuses, SystemStatus, SystemStatusSlotFlags,
-        )
+    InstrumentClass, InstrumentType,
+    SystemStatuses, SystemStatus, SystemStatusSlotFlags,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -29,13 +29,13 @@ class Q1Module(qc.instrument.InstrumentBase):
         'marker1_inv_en',
         'marker2_inv_en',
         'marker3_inv_en',
-        ]
+    ]
     _sim_parameters_qcm = [
         'out0_offset',
         'out1_offset',
         'out2_offset',
         'out3_offset',
-        ]
+    ]
     _sim_parameters_qcm_rf = [
         'out0_lo_freq',
         'out1_lo_freq',
@@ -49,7 +49,7 @@ class Q1Module(qc.instrument.InstrumentBase):
         'out1_offset_path1',
         'out0_lo_freq_cal_type_default',
         'out1_lo_freq_cal_type_default',
-        ]
+    ]
     _sim_parameters_qrm = [
         'out0_offset',
         'out1_offset',
@@ -64,7 +64,7 @@ class Q1Module(qc.instrument.InstrumentBase):
         'scope_acq_avg_mode_en_path1',
         'in0_offset',
         'in1_offset',
-        ]
+    ]
     _sim_parameters_qrm_rf = [
         'in0_att',
         'out0_att',
@@ -82,7 +82,7 @@ class Q1Module(qc.instrument.InstrumentBase):
         'scope_acq_avg_mode_en_path0',
         'scope_acq_avg_mode_en_path1',
         'out0_in0_lo_freq_cal_type_default',
-        ]
+    ]
 
     # NOTE: No __init__() !!!
     # This class is used as a mixin. Although quite heavy mixin.
@@ -118,13 +118,13 @@ class Q1Module(qc.instrument.InstrumentBase):
             'QCM-RF': 2,
             'QRM-RF': 1,
             'Viewer': 0,
-            }
+        }
         for ch in range(n_out_ch_type[sim_type]):
             sim_params += [
                 f'out{ch}_latency',
                 f'out{ch}_fir_config',
                 f'out{ch}_fir_coeffs',
-                ]
+            ]
             sim_params += [f'out{ch}_exp{i}_config' for i in range(4)]
             if sim_type == 'QCM':
                 sim_params += [f'out{ch}_exp{i}_time_constant' for i in range(4)]
@@ -133,7 +133,7 @@ class Q1Module(qc.instrument.InstrumentBase):
         for ch in range(4):
             sim_params += [
                 f'marker{ch}_fir_config',
-                ]
+            ]
             sim_params += [f'marker{ch}_exp{i}_config' for i in range(4)]
 
         for par_name in sim_params:
@@ -150,7 +150,6 @@ class Q1Module(qc.instrument.InstrumentBase):
         if sim_type == 'QRM-RF':
             self.out0_in0_lo_cal = lambda: logger.info("Calibrate LO 0")
 
-        self.armed_seq = set()
         if self._is_qrm:
             if self._is_rf:
                 self.in0_att(0)
@@ -178,16 +177,11 @@ class Q1Module(qc.instrument.InstrumentBase):
         return self._is_rf
 
     def reset(self):
-        self.armed_seq = set()
         for seq in self.sequencers:
             seq.reset()
 
     def _set(self, name, value):
         logger.info(f'{self.name}:{name}={value}')
-
-    def _seq_set(self, name, value):
-        seq_nr = int(name[9])
-        self.sequencers[seq_nr]._set_legacy(name[11:], value)
 
     def get_num_system_error(self):
         return 0
@@ -195,39 +189,79 @@ class Q1Module(qc.instrument.InstrumentBase):
     def get_system_error(self):
         return '0,"No error"'
 
-    def arm_sequencer(self, seq_nr):
-        self.armed_seq.add(seq_nr)
-        self.sequencers[seq_nr].arm()
+    def arm_sequencer(self, sequencer: int | None = None):
+        seq_nums = range(len(self.sequencers)) if sequencer is None else (sequencer,)
+        for seq_num in seq_nums:
+            self.sequencers[seq_num].arm_sequencer()
 
     def start_sequencer(self, sequencer: int | None = None):
-        start_indices = self.armed_seq if sequencer is None else (sequencer,)
+        start_indices = self.armed_sequencers if sequencer is None else (sequencer,)
         for seq_nr in start_indices:
             self.sequencers[seq_nr].start_sequencer()
 
     def stop_sequencer(self, sequencer: int | None = None):
-        self.armed_seq = set()
+        seq_nums = range(len(self.sequencers)) if sequencer is None else (sequencer,)
+        for seq_num in seq_nums:
+            self.sequencers[seq_num].stop_sequencer()
 
     def get_sequencer_status(self, seq_nr: int, timeout: int = 0, timeout_poll_res: float = 0.02):
         return self.sequencers[seq_nr].get_sequencer_status()
 
-    def get_acquisition_status(self, seq_nr: int, timeout: int = 0,
+    def get_acquisition_status(self, sequencer: int, timeout: int = 0,
                                timeout_poll_res: float = 0.02, check_seq_state: bool = True):
-        return self.sequencers[seq_nr].get_acquisition_status()
+        return self.sequencers[sequencer].get_acquisition_status()
 
-    def get_acquisitions(self, seq_nr: int, *, as_numpy: bool = False) -> dict:
-        return self.sequencers[seq_nr].get_acquisitions(as_numpy=as_numpy)
+    def get_waveforms(self, sequencer: int, *, as_numpy: bool = False):
+        return self.sequencers[sequencer].get_waveforms(as_numpy=as_numpy)
 
-    def delete_acquisition_data(self, seq_nr, name='', all=False):
-        self.sequencers[seq_nr].delete_acquisition_data(name=name, all=all)
+    def get_weights(self, sequencer: int, *, as_numpy: bool = False):
+        return self.sequencers[sequencer].get_weights(as_numpy=as_numpy)
 
-    def store_scope_acquisition(self, seq_nr: int, name: str):
-        self.sequencers[seq_nr].store_scope_acquisition(name)
+    def get_acquisitions(self, sequencer: int, *, as_numpy: bool = False) -> dict:
+        return self.sequencers[sequencer].get_acquisitions(as_numpy=as_numpy)
+
+    def delete_acquisition_data(self, sequencer, name='', all=False):
+        self.sequencers[sequencer].delete_acquisition_data(name=name, all=all)
+
+    def store_scope_acquisition(self, sequencer: int, name: str):
+        self.sequencers[sequencer].store_scope_acquisition(name)
 
     def start_adc_calib(self):
         if self._is_qrm:
             logger.info('Calibrate ADC')
         else:
             logger.error("QCM does not have method 'start_adc_calib'")
+
+    def connect_sequencer(self, sequencer: int, *connections: str) -> None:
+        self.sequencers[sequencer].connect_sequencer(*connections)
+
+    def disconnect_inputs(self) -> None:
+        if not self._is_qrm:
+            raise NotImplementedError("Instrument type is not QRM")
+        for sequencer in self.sequencers:
+            if self._is_rf:
+                sequencer.parameters["connect_acq"].set("off")
+            else:
+                sequencer.parameters["connect_acq_I"].set("off")
+                sequencer.parameters["connect_acq_Q"].set("off")
+
+    def disconnect_outputs(self) -> None:
+        n_out_ch = 4 if self._is_qcm else 2
+        if self._is_rf:
+            n_out_ch //= 2
+        for sequencer in self.sequencers:
+            for i in range(n_out_ch):
+                sequencer.parameters[f"connect_out{i}"].set("off")
+
+    # ---- Simulator specific methods ----
+
+    @property
+    def armed_sequencers(self):
+        return [
+            seq_num
+            for seq_num, seq in enumerate(self.sequencers)
+            if seq.run_state == "ARMED"
+        ]
 
     def config_seq(self, seq_nr, name, value):
         self.sequencers[seq_nr].config(name, value)
@@ -372,10 +406,10 @@ class Q1Module(qc.instrument.InstrumentBase):
 class Q1Simulator(qc.Instrument, Q1Module):
     _pulsar_parameters = [
         'reference_source',
-        ]
+    ]
     _log_only_params = [
         'led_brightness',
-        ]
+    ]
 
     def __init__(self, name, n_sequencers=6, sim_type=None):
         check_qblox_instrument_version()
@@ -419,7 +453,7 @@ class Q1Simulator(qc.Instrument, Q1Module):
         # Get list of armed sequencers
         # pass to sequence executor
 
-        sequencers = [self.sequencers[seq_number] for seq_number in self.armed_seq]
+        sequencers = [self.sequencers[seq_number] for seq_number in self.armed_sequencers]
         run_sequencers(sequencers, self.ignore_triggers)
 
     def _log_set(self, name, value):

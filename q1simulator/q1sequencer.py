@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from dataclasses import dataclass
 from functools import partial
 from typing import Iterator, Iterable
@@ -14,7 +15,7 @@ from qblox_instruments import (
     SequencerStatusFlags,
     SequencerStates,
     )
-
+from qblox_instruments.native.definitions import ChannelType
 
 from .q1core import Q1Core
 from .rt_renderer import Renderer, MockDataEntry
@@ -55,8 +56,9 @@ class Q1Sequencer(InstrumentChannel):
         'nco_prop_delay_comp_en',
         ]
 
-    def __init__(self, parent, name, sim_type):
+    def __init__(self, parent, name, sim_type, idx):
         super().__init__(parent, name)
+        self._idx = idx
         self._is_qcm = sim_type in ['QCM', 'QCM-RF', 'Viewer']
         self._is_qrm = sim_type in ['QRM', 'QRM-RF', 'Viewer']
         self._is_rf = sim_type in ['QCM-RF', 'QRM-RF']
@@ -86,7 +88,7 @@ class Q1Sequencer(InstrumentChannel):
             self.add_parameter(f'gain_awg_path{i}', set_cmd=partial(self._gain_awg, path=i))
             self.add_parameter(f'offset_awg_path{i}', set_cmd=partial(self._offset_awg, path=i))
 
-        self.add_parameter('sequence', set_cmd=self.upload)
+        self.add_parameter('sequence', set_cmd=self._upload)
         self.add_parameter('mod_en_awg', set_cmd=self._set_mod_en_awg)
         self.add_parameter('nco_freq', set_cmd=self._set_nco_freq)
         self.add_parameter('mixer_corr_gain_ratio', set_cmd=self._set_mixer_gain_ratio)
@@ -118,22 +120,9 @@ class Q1Sequencer(InstrumentChannel):
         self._trace = False
         self.reset()
 
-    def config(self, name, value):
-        if name == 'max_render_time':
-            self.rt_renderer.max_render_time = value
-        elif name == 'max_core_cycles':
-            self.q1core.max_core_cycles = value
-        elif name == 'trace':
-            self._trace = value
-            self.rt_renderer.trace_enabled = value
-        elif name == 'render_repetitions':
-            self.q1core.skip_loops = ("_start", ) if not value else ()
-        elif name == 'skip_loops':
-            self.q1core.skip_loops = value
-        elif name == 'skip_wait_sync':
-            self.rt_renderer.skip_wait_sync = value
-        elif name == 'acq_trigger_value':
-            self.rt_renderer.acq_trigger_value = value
+    @property
+    def seq_idx(self) -> int:
+        return self._idx
 
     def reset(self):
         self.waveforms = {}
@@ -149,9 +138,6 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer.trace_enabled = self._trace
         self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm)
         self.reset_trigger_thresholding()
-
-    def get_simulation_end_time(self):
-        return self.rt_renderer.time
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
@@ -226,7 +212,7 @@ class Q1Sequencer(InstrumentChannel):
     def _set_ttl_acq_auto_bin_incr_en(self, value):
         self.rt_renderer.set_ttl_acq_auto_bin_incr_en(value)
 
-    def upload(self, sequence):
+    def _upload(self, sequence):
         if isinstance(sequence, dict):
             pdict = sequence
         else:
@@ -242,6 +228,67 @@ class Q1Sequencer(InstrumentChannel):
             acquisitions = pdict['acquisitions']
             self._set_weights(weights)
             self._set_acquisitions(acquisitions)
+
+    def connect_sequencer(self, *connections: str):
+        is_rf = self._is_rf
+
+        for index, connection in enumerate(connections):
+            try:
+                # parsing copied from qblox-instruments.
+                # Parse syntax.
+                m = re.fullmatch(r"(in|out|io)(0|[1-9][0-9]*)(?:_(0|[1-9][0-9]*))?", connection)
+                if not m:
+                    raise ValueError("syntax error")
+
+                # Decode direction.
+                directions = []
+                if m.group(1) != "in":
+                    directions.append(ChannelType.AWG)
+                if m.group(1) != "out":
+                    directions.append(ChannelType.ACQ)
+
+                # Decode channel indices.
+                i_channel = int(m.group(2))
+                q_channel = m.group(3)
+                if q_channel is not None:
+                    q_channel = int(q_channel)
+
+                # Catch some expected mistakes gracefully.
+                if i_channel == q_channel:
+                    suggestion = m.group(1) + m.group(2)
+                    raise ValueError(
+                        "cannot connect I and Q path to the same I/O port "
+                        f"(did you mean {suggestion!r}?)"
+                    )
+                if is_rf and q_channel is not None:
+                    message = "for RF connections, only one I/O port should be specified"
+                    if i_channel % 2 == 0 and q_channel == i_channel + 1:
+                        # they're probably thinking in terms of DAC/ADC indices
+                        suggestion = f"{m.group(1)}{i_channel // 2}"
+                        message += (
+                            f" (you may be confused with DAC/ADC indices, "
+                            f"did you mean {suggestion!r}?)"
+                        )
+                    raise ValueError(message)
+
+                if ChannelType.AWG in directions:
+                    if is_rf:
+                        self.parameters[f"connect_out{i_channel}"].set("IQ")
+                    else:
+                        self.parameters[f"connect_out{i_channel}"].set("I")
+                        if q_channel is not None:
+                            self.parameters[f"connect_out{q_channel}"].set("Q")
+
+                if ChannelType.ACQ in directions:
+                    if is_rf:
+                        self.parameters["connect_acq"].set(f"in{i_channel}")
+                    else:
+                        self.parameters["connect_acq_I"].set(f"in{i_channel}")
+                        if q_channel is not None:
+                            self.parameters["connect_acq_Q"].set(f"in{q_channel}")
+
+            except Exception as e:
+                raise Exception(f"connection command {connection!r} (index {index}): {e}")
 
     def update_sequence(self, erase_existing: bool = False, **sequence):
         if "program" in sequence:
@@ -388,7 +435,12 @@ class Q1Sequencer(InstrumentChannel):
         self.run_state = 'ARMED'
 
     def start_sequencer(self):
+        if self.run_state != 'ARMED':
+            raise Exception(f"Sequencer not armed. state = {self.run_state}")
         self.run()
+
+    def stop_sequencer(self):
+        self.run_state = 'STOPPED'
 
     def run(self):
         self.run_state = 'RUNNING'
@@ -461,6 +513,26 @@ class Q1Sequencer(InstrumentChannel):
             }
 
     # --- Simulator specific methods ---
+
+    def config(self, name, value):
+        if name == 'max_render_time':
+            self.rt_renderer.max_render_time = value
+        elif name == 'max_core_cycles':
+            self.q1core.max_core_cycles = value
+        elif name == 'trace':
+            self._trace = value
+            self.rt_renderer.trace_enabled = value
+        elif name == 'render_repetitions':
+            self.q1core.skip_loops = ("_start", ) if not value else ()
+        elif name == 'skip_loops':
+            self.q1core.skip_loops = value
+        elif name == 'skip_wait_sync':
+            self.rt_renderer.skip_wait_sync = value
+        elif name == 'acq_trigger_value':
+            self.rt_renderer.acq_trigger_value = value
+
+    def get_simulation_end_time(self):
+        return self.rt_renderer.time
 
     def set_acquisition_mock_data(self,
                                   data: Iterable[MockDataType] | None,
