@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.0.2] - 2025-11-12
+
+- Added test feature `value_for_condition` for simple testing of conditional RT instructions.
+- Updated API to better match Cluster and Sequencer API of qblox-instruments.
+- Changed `update_sequence` to match qblox-instruments behaviour.
+
 ## \[1.0.1] - 2025-11-10
 
 - Added option output_per_sequencer to Q1Simulator/Q1Module/Q1Cluster
