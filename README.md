@@ -159,6 +159,9 @@ the simulator and mimic behavior of the cluster / module / sequencer:
 - get_acquisitions
 - delete_acquisition_data
 - update_sequence
+- connect_sequencer
+- disconnect_inputs
+- disconnect_outputs
 
 Simulated sequencer qcodes parameters:
 - gain_awg_pathX
@@ -166,11 +169,7 @@ Simulated sequencer qcodes parameters:
 - nco_freq
 - mod_en_awg
 - demod_en_acq
-- channel_map_path0_out0_en ( < v0.11)
-- channel_map_path1_out1_en ( < v0.11)
-- channel_map_path0_out2_en ( < v0.11)
-- channel_map_path1_out3_en ( < v0.11)
-- connect_outX (v0.11+)
+- connect_outX
 - sequence
 - mixer_corr_gain_ratio
 - mixer_corr_phase_offset_degree
@@ -248,9 +247,15 @@ after every acquisition. `sim.config('acq_trigger_value', 0)` sends no triggers.
 If `acq_trigger_value` is None then the simulator uses the threshold on the
 acquisition data.
 
+The condition evaluation can also be forced with the property `value_for_condition`
+of the module. If this value is 1 then OR, AND and XOR evaluate to true.
+If this value is 0 then NOR, NAND and XNOR evaluate to true.
+The feature is suitable for simple test.
+
 # Simulator output
 The simulator has some methods to show the simulator output.
 - `plot()` shows pyplot charts with the rendered output.
+- `get_output()` returns the rendered output in dictionary with numpy arrays.
 - `config("skip_loops", ("_start", ))` stops rendering when Q1Pulse main sequence is executed once.
 - `print_acquisitions()` prints the path0 and path1 data and average counts.
 - `print_registers()` prints the contents of the Q1 registers.
