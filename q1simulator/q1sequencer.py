@@ -307,8 +307,8 @@ class Q1Sequencer(InstrumentChannel):
                 indices = {wvf["index"]: name for name, wvf in waveforms.items()}
                 for name, waveform in sequence["waveforms"].items():
                     index = waveform["index"]
-                    if index in indices:
-                        del waveforms[indices[index]]
+                    if index in indices and indices[index] != name:
+                        raise Exception(f"Waveform index {index} already in use for {indices[index]}")
                     waveforms[name] = waveform
                 self._set_waveforms(waveforms)
             if "weights" in sequence:
@@ -316,8 +316,8 @@ class Q1Sequencer(InstrumentChannel):
                 indices = {weight["index"]: name for name, weight in weights.items()}
                 for name, weight in sequence["weights"].items():
                     index = weight["index"]
-                    if index in indices:
-                        del weights[indices[index]]
+                    if index in indices and indices[index] != name:
+                        raise Exception(f"Weight index {index} already in use for {indices[index]}")
                     weights[name] = weight
                 self._set_weights(weights)
             if "acquisitions" in sequence:
@@ -325,8 +325,8 @@ class Q1Sequencer(InstrumentChannel):
                 indices = {acq["index"]: name for name, acq in acquisitions.items()}
                 for name, acquisition in sequence["acquisitions"].items():
                     index = acquisition["index"]
-                    if index in indices:
-                        del acquisitions[indices[index]]
+                    if index in indices and indices[index] != name:
+                        raise Exception(f"Acquisition index {index} already in use for {indices[index]}")
                     acquisitions[name] = acquisition
                 self._set_acquisitions(acquisitions)
 
