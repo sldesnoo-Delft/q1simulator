@@ -284,7 +284,7 @@ class Q1Sequencer(InstrumentChannel):
                 self._set_acquisitions(acquisitions)
 
     def _set_waveforms(self, waveforms):
-        self.waveforms = waveforms
+        self.waveforms = waveforms.copy()
         wavedict = {}
         for name, datadict in waveforms.items():
             index = int(datadict['index'])
@@ -293,7 +293,7 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer.set_waveforms(wavedict)
 
     def _set_weights(self, weights):
-        self.weights = weights
+        self.weights = weights.copy()
         weightsdict = {}
         for name, datadict in weights.items():
             index = int(datadict['index'])
@@ -302,7 +302,7 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer.set_weights(weightsdict)
 
     def _set_acquisitions(self, acquisitions):
-        self.acquisitions = acquisitions
+        self.acquisitions = acquisitions.copy()
         acq_dict = {}
         for name, datadict in acquisitions.items():
             index = int(datadict['index'])
@@ -322,7 +322,7 @@ class Q1Sequencer(InstrumentChannel):
             bin_num = int(self.acquisitions[name]['index'])
             self.rt_renderer.set_mock_data(bin_num, data)
 
-    def get_status(self):
+    def get_sequencer_status(self, timeout: int = 0, timeout_poll_res: float = 0.02):
         info_flags = []
         warn_flags = []
         error_flags = [
@@ -342,10 +342,30 @@ class Q1Sequencer(InstrumentChannel):
             log,
         )
 
-    def get_acquisition_status(self):
+    def get_acquisition_status(self, timeout: int = 0, timeout_poll_res: float = 0.02, check_seq_state: bool = True):
         if not self._is_qrm:
             raise NotImplementedError('Instrument type is not QRM')
         return True
+
+    def get_waveforms(self, *, as_numpy: bool = False):
+        return {
+            name: {
+                "data": np.asarray(wvf["data"]) if as_numpy else list(wvf["data"]),
+                "index": wvf["index"],
+                }
+            for name, wvf in self.waveforms.items()
+            }
+
+    def get_weights(self, *, as_numpy: bool = False):
+        if not self._is_qrm:
+            raise NotImplementedError('Instrument type is not QRM')
+        return {
+            name: {
+                "data": np.asarray(weight["data"]) if as_numpy else list(weight["data"]),
+                "index": weight["index"],
+                }
+            for name, weight in self.weights.items()
+            }
 
     def set_trigger_thresholding(self, address: int, count: int, invert: bool) -> None:
         self.rt_renderer.set_trigger_count_threshold(address, count)
@@ -364,8 +384,11 @@ class Q1Sequencer(InstrumentChannel):
     def sideband_cal(self) -> None:
         logger.info(f"Calibrate sideband {self.name}")
 
-    def arm(self):
+    def arm_sequencer(self):
         self.run_state = 'ARMED'
+
+    def start_sequencer(self):
+        self.run()
 
     def run(self):
         self.run_state = 'RUNNING'
@@ -375,7 +398,7 @@ class Q1Sequencer(InstrumentChannel):
         self.q1core.run()
         self.run_state = 'STOPPED'
 
-    def get_acquisition_data(self, as_numpy: bool = False):
+    def get_acquisitions(self, *, as_numpy: bool = False):
         if not self._is_qrm:
             raise NotImplementedError('Instrument type is not QRM')
         cnt, data, thresholded = self.rt_renderer.get_acquisition_data()
@@ -504,6 +527,9 @@ class Q1Sequencer(InstrumentChannel):
 
     def set_trigger_events(self, events):
         self._trigger_events = events
+
+    def set_forced_condition_value(self, value):
+        self.rt_renderer.forced_condition_value = value
 
     def get_enabled_outputs(self):
         outputs = ""

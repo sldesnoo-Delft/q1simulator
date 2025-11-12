@@ -95,11 +95,12 @@ class Renderer:
         self.mixer_phase_offset_degree = 0.0
         self.delete_acquisition_data_all()
         self.next_settings = Settings()
-        self.enabled_paths = [False, False]
+        self.enabled_paths: list[bool] = [False, False]
+        self.trace_enabled: bool = False
         self.reset()
-        self.trace_enabled = False
-        self.skip_wait_sync = True
-        self.acq_trigger_value = None
+        self.skip_wait_sync: bool = True
+        self.acq_trigger_value: bool | None = None
+        self.forced_condition_value: int | None = None
         self.threshold_count = np.full(15, 0, dtype=np.uint16)
         self.threshold_invert = np.zeros(15, dtype=bool)
         self.acq_conf = AcqConf()
@@ -129,6 +130,7 @@ class Renderer:
         self.trigger_events: list[TriggerEvent] = []
         self.skip_rt = False
         self.else_wait = 0
+        self._trace(f"---Reset {self.name}---")
 
     def gain_awg_path(self, gain, path):
         self.next_settings.awg_gain[path] = gain
@@ -293,7 +295,16 @@ class Renderer:
             self.skip_rt = False
             return
         self._process_triggers()
-        # numpy arrays
+        if self.forced_condition_value is not None:
+            # forced condition value is 1 bit
+            state = self.forced_condition_value == 1
+            match = state if op in [0, 2, 4] else not state
+            self._trace(f'Cond {match} {state}')
+            self.skip_rt = not match
+            self.else_wait = else_wait
+            return
+
+        # use numpy uint8 arrays to get array of bits
         mask_ar = np.unpackbits([np.uint8(mask >> 8), np.uint8(mask & 0xFF)])[:0:-1]
         state = ((self.latch_regs >= self.threshold_count) ^ self.threshold_invert) & mask_ar
         bits_set = np.sum(state)
@@ -669,7 +680,7 @@ class AcqBuffer:
         while len(b) and self.write_ready <= time:
             acq = b.pop(0)
             write_start = max(acq, self.write_ready)
-            self.write_ready = write_start + 300
+            self.write_ready = write_start + 300 # TODO @@@ update for v1.0.0
         overflow = len(b) > 7
         if not overflow:
             b.append(time)

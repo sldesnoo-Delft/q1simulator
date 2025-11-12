@@ -139,7 +139,7 @@ class Q1Module(qc.instrument.InstrumentBase):
         for par_name in sim_params:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
 
-        self.sequencers = [Q1Sequencer(self, f'seq{i}', sim_type)
+        self.sequencers = [Q1Sequencer(self, f'seq{i}', sim_type, i)
                            for i in range(n_sequencers)]
         for i, seq in enumerate(self.sequencers):
             self.add_submodule(f'sequencer{i}', seq)
@@ -157,6 +157,9 @@ class Q1Module(qc.instrument.InstrumentBase):
             else:
                 self.in0_gain(0)
                 self.in1_gain(0)
+
+        # Extra attributes for testing with simulator
+        self._value_for_condition: int | None = None
 
     @property
     def module_type(self) -> InstrumentType:
@@ -199,19 +202,20 @@ class Q1Module(qc.instrument.InstrumentBase):
     def start_sequencer(self, sequencer: int | None = None):
         start_indices = self.armed_seq if sequencer is None else (sequencer,)
         for seq_nr in start_indices:
-            self.sequencers[seq_nr].run()
+            self.sequencers[seq_nr].start_sequencer()
 
     def stop_sequencer(self, sequencer: int | None = None):
         self.armed_seq = set()
 
-    def get_sequencer_status(self, seq_nr, timeout=0):
-        return self.sequencers[seq_nr].get_status()
+    def get_sequencer_status(self, seq_nr: int, timeout: int = 0, timeout_poll_res: float = 0.02):
+        return self.sequencers[seq_nr].get_sequencer_status()
 
-    def get_acquisition_status(self, seq_nr, timeout=0):
+    def get_acquisition_status(self, seq_nr: int, timeout: int = 0,
+                               timeout_poll_res: float = 0.02, check_seq_state: bool = True):
         return self.sequencers[seq_nr].get_acquisition_status()
 
     def get_acquisitions(self, seq_nr: int, *, as_numpy: bool = False) -> dict:
-        return self.sequencers[seq_nr].get_acquisition_data(as_numpy=as_numpy)
+        return self.sequencers[seq_nr].get_acquisitions(as_numpy=as_numpy)
 
     def delete_acquisition_data(self, seq_nr, name='', all=False):
         self.sequencers[seq_nr].delete_acquisition_data(name=name, all=all)
@@ -231,6 +235,19 @@ class Q1Module(qc.instrument.InstrumentBase):
     def config(self, name, value):
         for seq in self.sequencers:
             seq.config(name, value)
+
+    @property
+    def value_for_condition(self) -> int | None:
+        """If not None let conditions evaluate to true for OR, AND, XOR if value is 1
+        and for NOR, NAND and XNOR if value is 0.
+        """
+        return self._value_for_condition
+
+    @value_for_condition.setter
+    def value_for_condition(self, value: int | None):
+        self._value_for_condition = value
+        for seq in self.sequencers:
+            seq.set_forced_condition_value(value)
 
     def get_simulation_end_time(self):
         return max(seq.get_simulation_end_time() for seq in self.sequencers)
