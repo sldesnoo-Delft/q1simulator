@@ -88,6 +88,13 @@ class Q1Module(qc.instrument.InstrumentBase):
     # This class is used as a mixin. Although quite heavy mixin.
 
     def init_module(self, n_sequencers=6, sim_type=None):
+        
+        # When using the qblox_instruments ClusterType class, 
+        # for example ClusterType.CLUSTER_QCM,
+        # the sim_type is formatted as "Cluster QCM".
+        # So, start by stripping the "Cluster " prefix.
+        sim_type = str(sim_type).replace("Cluster ","")
+        
         self._sim_type = sim_type
         if sim_type is None:
             raise Exception('sim_type must be specified')
