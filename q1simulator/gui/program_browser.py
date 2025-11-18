@@ -29,7 +29,8 @@ class Q1ProgramBrowser(QtWidgets.QMainWindow):
     def __init__(
         self,
         path: str | None = None,
-        gui_style: str | None = None
+        gui_style: str | None = None,
+        trace_simulation: bool = False,
     ):
         """Creates program browser
 
@@ -60,6 +61,7 @@ class Q1ProgramBrowser(QtWidgets.QMainWindow):
         self.resize(860, 600)
         self.create_ui()
         self.fill_program_list()
+        self._program_details.trace_simulation = trace_simulation
         self.show()
 
         if _app is not None:

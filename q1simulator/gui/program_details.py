@@ -11,6 +11,7 @@ class ProgramDetailsWidget(QtWidgets.QWidget):
         super().__init__(parent)
         self._prog_config = None
         self._path = None
+        self.trace_simulation = False
 
         layout = QtWidgets.QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -57,15 +58,22 @@ class ProgramDetailsWidget(QtWidgets.QWidget):
         max_time.setSingleStep(1000)
         self._max_time_spin = max_time
 
+        self._iq_plot = QtWidgets.QComboBox()
+        self._iq_plot.addItems(["I-only", "I+Q"])
+
         self._analogue_cb = QtWidgets.QCheckBox("Analogue filter")
         self._plot_btn = QtWidgets.QPushButton("Plot")
+        self._plot_btn.setMinimumWidth(80)
 
         layout = QtWidgets.QHBoxLayout()
         layout.addWidget(QtWidgets.QLabel("t min."))
         layout.addWidget(min_time)
         layout.addWidget(QtWidgets.QLabel("t max."))
         layout.addWidget(max_time)
+        layout.addWidget(QtWidgets.QLabel("IQ"))
+        layout.addWidget(self._iq_plot)
         layout.addWidget(self._analogue_cb)
+        layout.addItem(QtWidgets.QSpacerItem(1, 1, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum))
         layout.addWidget(self._plot_btn)
 
         return layout
@@ -126,6 +134,7 @@ class ProgramDetailsWidget(QtWidgets.QWidget):
         max_time = self._max_time_spin.value()
         if max_time == 0:
             max_time = None
+        plot_i_only = self._iq_plot.currentText() == "I-only"
 
         plot_simulation(
             self._path,
@@ -135,4 +144,6 @@ class ProgramDetailsWidget(QtWidgets.QWidget):
             max_time=max_time,
             analogue_filter=self._analogue_cb.isChecked(),
             analogue_output_frequency=4e9,
+            plot_i_only=plot_i_only,
+            trace=self.trace_simulation,
             )

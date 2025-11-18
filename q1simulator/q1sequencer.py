@@ -6,6 +6,7 @@ from functools import partial
 from typing import Iterator, Iterable
 
 import numpy as np
+from numpy.typing import NDArray
 
 from qcodes.instrument.channel import InstrumentChannel
 
@@ -619,6 +620,9 @@ class Q1Sequencer(InstrumentChannel):
             analogue_filter=analogue_filter,
             output_frequency=output_frequency,
             )
+
+    def get_acquisition_windows(self) -> list[tuple[NDArray, NDArray, NDArray]]:
+        return self.rt_renderer.get_acquisition_windows()
 
     def print_registers(self, reg_nrs=None):
         self.q1core.print_registers(reg_nrs)

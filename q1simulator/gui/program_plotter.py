@@ -1,8 +1,9 @@
-from numbers import Number
 from typing import Any
 
+import numpy as np
 import pyqtgraph as pg
-from qtpy import QtWidgets
+from numpy.typing import NDArray
+from qtpy import QtWidgets, QtCore
 
 from q1simulator import Q1Simulator
 from q1simulator.channel_data import MarkerOutput, SampledOutput
@@ -48,9 +49,14 @@ class PlotWindow(QtWidgets.QMainWindow):
 
         pw = pg.PlotWidget()
         self._plot_widget = pw
+        pw.getAxis('bottom').enableAutoSIPrefix(False)
         pw.getAxis('bottom').setLabel("time", "ns")
         pw.getAxis('left').setLabel("output", "V")
         pw.addLegend()
+        self.proxy = pg.SignalProxy(pw.scene().sigMouseMoved, rateLimit=60, slot=self.mouseMoved)
+        self._time_label = pg.LabelItem("-- ns")
+        self._time_label.setParentItem(pw.getPlotItem().vb)
+        self._time_label.anchor(itemPos=(0.0, 0.0), parentPos=(0.0, 0.0), offset=(35, 10))
 
         layout = QtWidgets.QHBoxLayout()
         layout.addWidget(self._plot_widget, 1)
@@ -58,10 +64,22 @@ class PlotWindow(QtWidgets.QMainWindow):
         content.setLayout(layout)
         self.setCentralWidget(content)
 
+    def mouseMoved(self, evt):
+        viewbox = self._plot_widget.getPlotItem().vb
+        pos = evt[0]  # using signal proxy turns original arguments into a tuple
+        if viewbox.sceneBoundingRect().contains(pos):
+            mousePoint = viewbox.mapSceneToView(pos)
+            x_val = mousePoint.x()
+            self._time_label.setText(f"{x_val:.0f} ns")
+
     def plot(self, x, y, style: str = "", label: str = None):
         color = color_list[self._n_plots % len(color_list)]
+        if style == ":":
+            pen = pg.mkPen(color, style=QtCore.Qt.DashLine)
+        else:
+            pen = color
         pw = self._plot_widget
-        pw.plot(x, y, name=label, pen=color)
+        pw.plot(x, y, name=label, pen=pen)
         self._n_plots += 1
 
     def closeEvent(self, event):
@@ -79,6 +97,8 @@ def plot_simulation(
         render_repetitions: bool = False,
         skip_wait_sync: bool = True,
         analogue_output_frequency: float = 4e9,
+        plot_i_only: bool = True,
+        trace: bool = False,
         ):
     global _sim_counter
 
@@ -94,7 +114,7 @@ def plot_simulation(
     sim.config("max_core_cycles", max_core_cycles)
     sim.config('skip_loops', () if render_repetitions else ("_start", ))
     sim.config('skip_wait_sync', skip_wait_sync)
-    # sim.config('trace', True)
+    sim.config('trace', trace)
     sim.ignore_triggers = True
 
     _sim_counter += 1
@@ -126,13 +146,13 @@ def plot_simulation(
 
     for i, ch_name in enumerate(channels):
         status = sim.get_sequencer_status(i)
-        print(f"State {ch_name}: {status.status} - {status.state}, {[str(flag) for flag in status.info_flags]}")
         if status.warn_flags or status.err_flags:
+            print(f"State {ch_name}: {status.status} - {status.state}, {[str(flag) for flag in status.info_flags]}")
             print(f"  warnings: {[str(flag) for flag in status.warn_flags]}, "
                   f"errors: {[str(flag) for flag in status.err_flags]}, log: {status.log}")
 
     # plot
-    output_per_sequencer = True
+    output_per_sequencer = True # TODO  @@@
     output = sim.get_output(
         t_min=min_time,
         t_max=max_time,
@@ -154,10 +174,39 @@ def plot_simulation(
             pw.plot(x, y, linestyle, label=name)
         elif isinstance(data, SampledOutput):
             t = data.get_time_data()
+            if plot_i_only and name.endswith("-Q"):
+                continue
             pw.plot(t, data.data, linestyle, label=name)
 
-    # sim.print_acquisitions()
+    acq_windows = sim.get_acquisition_windows()
+    for name, data in acq_windows.items():
+        n = len(data)
+        t_list = [data[i][0] for i in range(n)]
+        i_list = [data[i][1] for i in range(n)]
+        q_list = [data[i][2] for i in range(n)]
+        t = _concat_with_NaN(t_list)
+        i = _concat_with_NaN(i_list)
+        q = _concat_with_NaN(q_list)
+        if not plot_i_only and not np.array_equal(i, q, equal_nan=True):
+            i_label = name+"-I"
+            q_label = name+"-Q"
+        else:
+            i_label = name
+            q = None
+        pw.plot(t, i, ":", label="ACQ:"+i_label)
+        if q is not None:
+            pw.plot(t, q, ":", label="ACQ:"+q_label)
 
     sim.close()
 
     return pw
+
+
+def _concat_with_NaN(x: list[NDArray]) -> NDArray:
+    nan_array = np.array([np.nan])
+    t = []
+    for i, d in enumerate(x):
+        if i > 0:
+            t.append(nan_array)
+        t.append(d)
+    return np.concatenate(t)

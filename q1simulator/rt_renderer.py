@@ -7,6 +7,7 @@ from collections.abc import Sequence as AbcSequence
 from functools import wraps
 
 import numpy as np
+from numpy.typing import NDArray
 
 from .analogue_filter import AnalogueFilter
 from .channel_data import MarkerOutput, SampledOutput
@@ -37,6 +38,14 @@ class AcqConf:
     trigger_en: bool = False
     trigger_addr: int = 0
     trigger_invert: bool = False
+
+
+@dataclass
+class AcqIntegration:
+    start: int
+    stop: int
+    weight0: int | None = None
+    weight1: int | None = None
 
 
 def _phase2float(phase_uint32):
@@ -118,6 +127,7 @@ class Renderer:
         self.waves = (None, None)
         self.out0 = []
         self.out1 = []
+        self.acq_integrations: list[AcqIntegration] = []
         self.marker_out = [list() for _ in range(4)]  # a list per marker
         self.acq_times = {i: [] for i in self.acquisitions}
         self.acq_buffer = AcqBuffer()
@@ -252,7 +262,7 @@ class Renderer:
                 len(self.acq_weights[weight0]),
                 len(self.acq_weights[weight1])
             )
-            self._add_acquisition(acq_index, bin_index, duration)
+            self._add_acquisition(acq_index, bin_index, duration, weight0, weight1)
         self._render(wait_after)
 
     @check_conditional(clear_latched_settings=True)
@@ -529,12 +539,17 @@ class Renderer:
         self.acq_data[index] = np.full((num_bins, 2), np.nan)
         self.acq_thresholded[index] = np.full(num_bins, np.nan)
 
-    def _add_acquisition(self, acq_index, bin_index, duration):
+    def _add_acquisition(self, acq_index: int, bin_index: int, duration: int,
+                         weight0: int | None = None,
+                         weight1: int | None = None):
         t = self.time
+        t_end = t + duration
         if acq_index not in self.acquisitions:
             self._error('ACQ INDEX INVALID')
             return
+
         self.acq_times[acq_index].append((t, bin_index))
+        self.acq_integrations.append(AcqIntegration(t, t_end, weight0, weight1))
         if bin_index >= self.acquisitions[acq_index]:
             self._error('ACQ BIN INDEX INVALID')
             return
@@ -557,7 +572,6 @@ class Renderer:
         self.acq_count[acq_index][bin_index] += 1
 
         if acq_conf.trigger_en:
-            t_end = t + duration
             if self.acq_trigger_value is None:
                 trigger_state = state ^ acq_conf.trigger_invert
             else:
@@ -572,6 +586,7 @@ class Renderer:
             self._error('ACQ INDEX INVALID')
             return
         self.acq_times[acq_index].append((start, bin_index))
+        self.acq_integrations.append(AcqIntegration(start, stop))
         if bin_index >= self.acquisitions[acq_index]:
             self._error('ACQ BIN INDEX INVALID')
             return
@@ -668,6 +683,29 @@ class Renderer:
 
     def get_acquisition_list(self):
         return self.acq_times
+
+    def get_acquisition_windows(self) -> list[tuple[NDArray, NDArray, NDArray]]:
+        """Return acquisition integration windows.
+
+        Returns:
+            list with (time, I-window, Q-window)
+        """
+        windows = []
+        for acq_int in self.acq_integrations:
+            # Add 0,0 before and after window
+            t = np.arange(acq_int.start-1, acq_int.stop+1)
+            i = np.zeros(len(t))
+            q = np.zeros(len(t))
+            if acq_int.weight0 is not None:
+                w0 = self.acq_weights[acq_int.weight0]
+                w1 = self.acq_weights[acq_int.weight1]
+                i[1: len(w0)+1] = w0
+                q[1: len(w1)+1] = w1
+            else:
+                i[1: -1] = 1
+                q[1: -1] = 1
+            windows.append((t, i, q))
+        return windows
 
 
 class AcqBuffer:

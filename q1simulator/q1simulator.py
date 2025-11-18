@@ -4,6 +4,7 @@ from functools import partial
 import numpy as np
 import matplotlib.pyplot as pt
 import qcodes as qc
+from numpy.typing import NDArray
 
 from .channel_data import MarkerOutput, SampledOutput
 from .q1sequencer import Q1Sequencer
@@ -88,13 +89,13 @@ class Q1Module(qc.instrument.InstrumentBase):
     # This class is used as a mixin. Although quite heavy mixin.
 
     def init_module(self, n_sequencers=6, sim_type=None):
-        
-        # When using the qblox_instruments ClusterType class, 
+
+        # When using the qblox_instruments ClusterType class,
         # for example ClusterType.CLUSTER_QCM,
         # the sim_type is formatted as "Cluster QCM".
         # So, start by stripping the "Cluster " prefix.
-        sim_type = str(sim_type).replace("Cluster ","")
-        
+        sim_type = str(sim_type).replace("Cluster ", "")
+
         self._sim_type = sim_type
         if sim_type is None:
             raise Exception('sim_type must be specified')
@@ -321,6 +322,8 @@ class Q1Module(qc.instrument.InstrumentBase):
                     t = data.get_time_data()
                     pt.plot(t, data.data, linestyle, label=name)
 
+        self._plot_acquisition_windows()
+
         limits = {}
         if t_min is not None:
             limits['left'] = t_min
@@ -328,6 +331,36 @@ class Q1Module(qc.instrument.InstrumentBase):
             limits['right'] = t_max
         if limits:
             pt.xlim(**limits)
+
+    def _plot_acquisition_windows(self, plot_i_only: bool = True):
+
+        def _concat_with_NaN(x: list[NDArray]) -> NDArray:
+            nan_array = np.array([np.nan])
+            t = []
+            for i, d in enumerate(x):
+                if i > 0:
+                    t.append(nan_array)
+                t.append(d)
+            return np.concatenate(t)
+
+        acq_windows = self.get_acquisition_windows()
+        for name, data in acq_windows.items():
+            n = len(data)
+            t_list = [data[i][0] for i in range(n)]
+            i_list = [data[i][1] for i in range(n)]
+            q_list = [data[i][2] for i in range(n)]
+            t = _concat_with_NaN(t_list)
+            i = _concat_with_NaN(i_list)
+            q = _concat_with_NaN(q_list)
+            if not plot_i_only and not np.array_equal(i, q, equal_nan=True):
+                i_label = name+"-I"
+                q_label = name+"-Q"
+            else:
+                i_label = name
+                q = None
+            pt.plot(t, i, ":", label="ACQ:"+i_label)
+            if q is not None:
+                pt.plot(t, q, ":", label="ACQ:"+q_label)
 
     def get_output(self,
                    t_min: float = None,
@@ -408,6 +441,14 @@ class Q1Module(qc.instrument.InstrumentBase):
 
     def print_registers(self, seq_nr, reg_nrs=None):
         self.sequencers[seq_nr].print_registers(reg_nrs)
+
+    def get_acquisition_windows(self) -> dict[str, list[tuple[NDArray, NDArray, NDArray]]]:
+        windows = {}
+        for seq in self.sequencers:
+            seq_windows = seq.get_acquisition_windows()
+            if seq_windows:
+                windows[seq.label] = seq_windows
+        return windows
 
 
 class Q1Simulator(qc.Instrument, Q1Module):
