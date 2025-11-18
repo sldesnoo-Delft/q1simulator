@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.0.3] - 2025-11-18
+
+- Added plotting of acquisition windows to Q1ProgramBrowser and `simulator.plot`.
+- Fixed units [kns] in Q1ProgramBrowser.
+- Added display of time at mouse cursor in Q1ProgramBrowser.
+
 ## \[1.0.2] - 2025-11-12
 
 - Added test feature `value_for_condition` for simple testing of conditional RT instructions.
