@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.0.4] - 2025-12-04
+
+- Fixed import that broke backwards compatibility with qblox-instruments v0.17.
+
 ## \[1.0.3] - 2025-11-18
 
 - Added plotting of acquisition windows to Q1ProgramBrowser and `simulator.plot`.

@@ -16,7 +16,6 @@ from qblox_instruments import (
     SequencerStatusFlags,
     SequencerStates,
     )
-from qblox_instruments.native.definitions import ChannelType
 
 from .q1core import Q1Core
 from .rt_renderer import Renderer, MockDataEntry
@@ -243,10 +242,13 @@ class Q1Sequencer(InstrumentChannel):
 
                 # Decode direction.
                 directions = []
-                if m.group(1) != "in":
-                    directions.append(ChannelType.AWG)
-                if m.group(1) != "out":
-                    directions.append(ChannelType.ACQ)
+                if m.group(1) == "out":
+                    directions.append("out")
+                elif m.group(1) == "in":
+                    directions.append("in")
+                elif m.group(1) == "io":
+                    directions.append("in")
+                    directions.append("out")
 
                 # Decode channel indices.
                 i_channel = int(m.group(2))
@@ -272,7 +274,7 @@ class Q1Sequencer(InstrumentChannel):
                         )
                     raise ValueError(message)
 
-                if ChannelType.AWG in directions:
+                if "out" in directions:
                     if is_rf:
                         self.parameters[f"connect_out{i_channel}"].set("IQ")
                     else:
@@ -280,7 +282,7 @@ class Q1Sequencer(InstrumentChannel):
                         if q_channel is not None:
                             self.parameters[f"connect_out{q_channel}"].set("Q")
 
-                if ChannelType.ACQ in directions:
+                if "in" in directions:
                     if is_rf:
                         self.parameters["connect_acq"].set(f"in{i_channel}")
                     else:
