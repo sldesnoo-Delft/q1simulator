@@ -182,6 +182,8 @@ class Q1Plotter:
         sim_seq.sync_en(cluster_seq.sync_en.cache())
         if not sim_seq.sync_en():
             return False
+        if not cluster_seq.sequence.cache.valid:
+            raise Exception("Sequence parameter cache is not valid")
         sequence = cluster_seq.sequence.cache()
         if not isinstance(sequence, dict):
             if not os.path.exists(sequence):
