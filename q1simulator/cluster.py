@@ -10,7 +10,8 @@ from qblox_instruments import (
         )
 
 from .qblox_version import check_qblox_instrument_version
-from .q1simulator import Q1Module, run_sequencers
+from .q1simulator import run_sequencers
+from .q1module import Q1Module
 
 
 logger = logging.getLogger(__name__)
