@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.0.5] - 2025-12-13
+
+- Fixed plotting for tmin > 0.
+
 ## \[1.0.4] - 2025-12-04
 
 - Fixed import that broke backwards compatibility with qblox-instruments v0.17.
