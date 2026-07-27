@@ -19,6 +19,7 @@ from qblox_instruments import (
 
 from .q1core import Q1Core
 from .rt_renderer import Renderer, MockDataEntry
+from .qblox_version import Version, qblox_version
 
 
 logger = logging.getLogger(__name__)
@@ -383,14 +384,26 @@ class Q1Sequencer(InstrumentChannel):
         if self._is_qrm:
             info_flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
 
-        return SequencerStatus(
-            SequencerStatuses.OKAY,
-            SequencerStates[self.run_state],
-            info_flags,
-            warn_flags,
-            error_flags,
-            log,
-        )
+        if qblox_version >= Version("1.2.0"):
+            exit_code = 0
+            return SequencerStatus(
+                SequencerStatuses.OKAY,
+                SequencerStates[self.run_state],
+                exit_code,
+                info_flags,
+                warn_flags,
+                error_flags,
+                log,
+            )
+        else:
+            return SequencerStatus(
+                SequencerStatuses.OKAY,
+                SequencerStates[self.run_state],
+                info_flags,
+                warn_flags,
+                error_flags,
+                log,
+            )
 
     def get_acquisition_status(self, timeout: int = 0, timeout_poll_res: float = 0.02, check_seq_state: bool = True):
         if not self._is_qrm:
