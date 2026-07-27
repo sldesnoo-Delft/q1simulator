@@ -49,6 +49,13 @@ class Cluster(qc.Instrument):
 
     def __init__(self, name, modules={}):
         check_qblox_instrument_version()
+        if qc.Instrument.exist(name):
+            logger.info(f"Closing old simulator with same name ({name})")
+            old = qc.Instrument.find_instrument(name)
+            if not str(old.__class__) == str(Cluster):
+                raise Exception(f"Oops, existing instrument '{name}' is not a cluster")
+            old.close()
+
         super().__init__(name)
 
         # TODO return trigger count
