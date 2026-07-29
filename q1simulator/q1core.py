@@ -13,7 +13,9 @@ RT_BUFFER_SIZE = 32
 
 
 class Halt(Exception):
-    pass
+    def __init__(self, msg, exit_code):
+        super().__init__(f"{exit_code}: {msg}")
+        self.exit_code = exit_code
 
 
 class Abort(Exception):
@@ -25,7 +27,8 @@ class Illegal(Exception):
 
 
 class Q1Core:
-    def __init__(self, name, renderer, is_qrm):
+
+    def __init__(self, name, renderer, is_qrm, isa_version: int = 1):
         self.name = name
         self.renderer = renderer
         self._is_qrm = is_qrm
@@ -36,9 +39,20 @@ class Q1Core:
         self.instructions = []
         self.iptr = 0
         self.errors = set()
+        self.v2 = isa_version == 2
+        if self.v2:
+            self._jge = self._jge_v2
+            self._depr_acquire_weighed = self._acquire_weighted
+        else:
+            self._jge = self._jge_v1
+            self._jlt = self._jlt_v1
+            self._jge = self._jge_v1
+            self._loop = self._loop_v1
+            self._asr = self._lsr  # it does not extend the sign.
+            self._acquire_weighed = self._acquire_weighted
 
     def load(self, program):
-        parser = Q1Parser()
+        parser = Q1Parser(self.v2)
         self.lines, self.instructions = parser.parse(program)
 
     def get_used_triggers(self) -> int:
@@ -58,8 +72,13 @@ class Q1Core:
 
     def run(self):
         self.errors = set()
-        self.R = np.zeros(64, dtype=np.uint32)
+        self.exit_code = -1
         self.iptr = 0
+        self.zf = 0  # zero
+        self.nf = 0  # negative
+        self.cf = 0  # unsigned carry
+        self.of = 0  # signed overflow
+        self.updating_reg = None
         self.clock = CoreClock()
         # give the core a head start of 10 cycles
         self.clock.add_ticks(-10)
@@ -89,9 +108,12 @@ class Q1Core:
                 if instr.reg_args is not None:
                     args = instr.args.copy()
                     for i in instr.reg_args:
+                        if i == self.updating_reg:
+                            raise Exception(f"Register R{i} cannot be read immediately after write.")
                         args[i] = self.R[args[i]]
                 else:
                     args = instr.args
+                self.updating_reg = None
                 self.clock.add_ticks(instr.clock_ticks)
                 instr.func(*args)
                 if self.iptr >= len(self.instructions):
@@ -99,9 +121,10 @@ class Q1Core:
                 if cntr >= self.max_core_cycles:
                     raise Abort('Core cycle limited exceeded',
                                 'FORCED STOP')
-        except Halt:
+        except Halt as ex:
             rt_time_us = self.renderer.time / 1000
-            logger.info(f'{self.name}: stopped ({cntr} cycles, {rt_time_us:7.3f} us)')
+            self.exit_code = ex.exit_code
+            logger.info(f'{self.name}: stopped ({cntr} cycles, {rt_time_us:7.3f} us), exit_code: {self.exit_code}')
         except Illegal as ex:
             msg = f'Illegal instruction at line {self.iptr}: {ex}'
             self._print_error_msg(msg, instr, cntr)
@@ -131,7 +154,22 @@ class Q1Core:
 
     def _set_register(self, reg_nr, value):
         self.R[reg_nr] = value
+        self.updating_reg = reg_nr
         # print(f'R{reg_nr} = {np.int32(np.uint32(self.R[reg_nr]))} ({self.R[reg_nr]:08X})')
+
+    def set_registers(self, registers: dict[str, int]):
+        for reg_name, value in registers.items():
+            reg_nr = int(reg_name[1:])
+            self.R[reg_nr] = np.int64(value)
+
+    def get_registers(self, registers: list[str] | None) -> dict[str, int]:
+        res: dict[str, int] = {}
+        if registers is None:
+            registers = [f"R{i}" for i in range(len(self.R))]
+        for reg_name in registers:
+            reg_nr = int(reg_name[1:])
+            res[reg_name] = int(self.R[reg_nr])
+        return res
 
     def print_registers(self, reg_nrs=None):
         if reg_nrs is None:
@@ -142,13 +180,19 @@ class Q1Core:
             float_value = signed_value / 2**31
             print(f'R{reg_nr:02}: {value:08X} {signed_value:11}  ({float_value:9.6f})')
 
+    def _set_result_flags(self, res):
+        self.zf = res == 0
+        self.nf = (res >> 31) & 1
+        self.of = 0
+        self.cf = 0
+
     # === Below are Q1ASM opcode mnemonics with _ prefix.
 
     def _illegal(self):
         raise Illegal('illegal instruction')
 
-    def _stop(self):
-        raise Halt('stop instruction')
+    def _stop(self, exit_code: int = 0):
+        raise Halt('stop instruction', exit_code=exit_code)
 
     def _nop(self):
         pass
@@ -158,7 +202,91 @@ class Q1Core:
         self.clock.add_ticks(3)
         self.iptr = label
 
-    def _jlt(self, value, n, label):
+    def _jz(self, label):
+        if self.zf:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jnz(self, label):
+        if not self.zf:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jo(self, label):
+        if self.of:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jno(self, label):
+        if not self.of:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _js(self, label):
+        if self.nf:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jns(self, label):
+        if not self.nf:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jg(self, label):
+        if not self.zf and (self.nf == self.of):
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jge_v2(self, label):
+        if self.nf == self.of:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jl(self, label):
+        if self.nf != self.of:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jle(self, label):
+        if self.zf or (self.nf != self.of):
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _ja(self, label):
+        if not self.zf and not self.cf:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jae(self, label):
+        if not self.cf:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jb(self, label):
+        if self.cf:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jbe(self, label):
+        if self.zf or self.cf:
+            # 3 cycles for jump
+            self.clock.add_ticks(3)
+            self.iptr = label
+
+    def _jlt_v1(self, value, n, label):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         if value < n:
@@ -166,7 +294,7 @@ class Q1Core:
             self.clock.add_ticks(3)
             self.iptr = label
 
-    def _jge(self, value, n, label):
+    def _jge_v1(self, value, n, label):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         if value >= n:
@@ -174,7 +302,7 @@ class Q1Core:
             self.clock.add_ticks(3)
             self.iptr = label
 
-    def _loop(self, register, label):
+    def _loop_v1(self, register, label):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
         self._set_register(register, self.R[register] - 1)
@@ -188,48 +316,200 @@ class Q1Core:
             self.clock.add_ticks(3)
             self.iptr = label
 
+    def _depr_jlt(self, value, n, label): # TODO @@@@ check timing. Register for label should not add clock tick
+        self._cmp(value, n)
+        # 1 cycle to load instruction
+        self.clock.add_ticks(1)
+        self._jb(label)
+
+    def _depr_jge(self, value, n, label): # TODO @@@@ check timing. Register for label should not add clock tick
+        self._cmp(value, n)
+        # 1 cycle to load instruction
+        self.clock.add_ticks(1)
+        self._jae(label)
+
+    def _depr_loop(self, register, label): # TODO @@@@ check timing. Register for label should not add clock tick
+        # 1 cycle to load register value
+        self.clock.add_ticks(1)
+        value = self.R[register]
+        self._sub(value, 1, register)
+        # 1 cycle to load instruction
+        self.clock.add_ticks(1)
+        self.updating_reg = None
+        self._jnz(label)
+
     def _move(self, source, destination):
         self._set_register(destination, source)
 
     def _not(self, source, destination):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
-        self._set_register(destination, ~source)
+        res = ~source
+        self._set_result_flags(res)
+        self._set_register(destination, res)
 
     def _add(self, lhs, rhs, destination):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
-        self._set_register(destination, lhs + rhs)
 
-    def _sub(self, lhs, rhs, destination):
+        res = lhs + rhs
+
+        # signed / usigned 32 bit calculations
+        ures = np.uint64(lhs) + rhs
+        sres = np.int64(np.int32(lhs)) + np.int32(rhs)
+        self.cf = ures >= (1 << 32)
+        self.of = sres >= (1 << 31) or sres < -(1 << 31)
+        self.zf = res == 0
+        self.nf = np.int32(sres) < 0
+        self._set_register(destination, res)
+
+    def _sub(self, lhs, rhs, destination: int | None):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
-        self._set_register(destination, lhs - rhs)
+        res = lhs - rhs
 
-    def _and(self, lhs, rhs, destination):
+        # signed / usigned 32 bit calculations
+        ures = np.uint64(lhs) - rhs
+        sres = np.int64(np.int32(lhs)) - np.int32(rhs)
+        self.cf = ures >= (1 << 32)
+        self.of = sres >= (1 << 31) or sres < -(1 << 31)
+        self.zf = res == 0
+        self.nf = np.int32(sres) < 0
+        if destination is not None:
+            self._set_register(destination, lhs - rhs)
+
+    def _cmp(self, lhs, rhs):
+        self._sub(lhs, rhs, None)
+
+    def _mulu16(self, lhs, rhs, destination):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
-        self._set_register(destination, lhs & rhs)
+        mask = (1 << 16) - 1
+        res = np.uint32(lhs & mask) * np.uint32(rhs & mask)
+        self._set_result_flags(res)
+        self._set_register(destination, res)
+
+    def _muls16(self, lhs, rhs, destination):
+        # 2 cycles for arithmetic
+        self.clock.add_ticks(2)
+        # some casting to get correct signs
+        res = np.int32(np.int16(lhs)) * np.int16(rhs)
+        self._set_result_flags(res)
+        self._set_register(destination, res)
+
+    def _mulu32(self, lhs, rhs, destination_low: int | None, destination_high: int | None):
+        self.clock.add_ticks(3)
+        res = np.uint64(lhs) * np.uint64(rhs)
+        mask = (1 << 32) - 1
+        hres = res >> 32
+        lres = res & mask
+        if destination_low is None:
+            self.zf = hres == 0
+            self.nf = np.int32(hres) < 0
+        elif destination_high is None:
+            self.zf = lres == 0
+            self.nf = np.int32(lres) < 0
+        else:
+            self.zf = res == 0
+            self.nf = np.int64(res) < 0
+        self.cf = 0
+        self.of = 0
+        if destination_low is not None:
+            self.clock.add_ticks(1)
+            self._set_register(destination_low, lres)
+        if destination_high is not None:
+            self.clock.add_ticks(1)
+            self._set_register(destination_high, hres)
+
+    def _mulu32l(self, lhs, rhs, destination_low):
+        self._mulu32(lhs, rhs, destination_low, None)
+
+    def _mulu32h(self, lhs, rhs, destination_high):
+        self._mulu32(lhs, rhs, None, destination_high)
+
+    def _muls32(self, lhs, rhs, destination_low: int | None, destination_high: int | None):
+        self.clock.add_ticks(3)
+        res = np.int64(np.int32(lhs)) * np.int32(rhs)
+        self.zf = res == 0
+        self.nf = res < 0
+        self.cf = 0
+        self.of = 0
+        if destination_low is not None:
+            mask = (1 << 32) - 1
+            self.clock.add_ticks(1)
+            self._set_register(destination_low, res & mask)
+        if destination_high is not None:
+            self.clock.add_ticks(1)
+            self._set_register(destination_high, res >> 32)
+
+    def _muls32l(self, lhs, rhs, destination_low):
+        self._muls32(lhs, rhs, destination_low, None)
+
+    def _muls32h(self, lhs, rhs, destination_high):
+        self._muls32(lhs, rhs, None, destination_high)
+
+    def _and(self, lhs, rhs, destination: int | None):
+        # 2 cycles for arithmetic
+        self.clock.add_ticks(2)
+        res = lhs & rhs
+        self._set_result_flags(res)
+        if destination is not None:
+            self._set_register(destination, res)
+
+    def _test(self, lhs, rhs):
+        self._and(lhs, rhs, None)
 
     def _or(self, lhs, rhs, destination):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
-        self._set_register(destination, lhs | rhs)
+        res = lhs | rhs
+        self._set_result_flags(res)
+        self._set_register(destination, res)
 
     def _xor(self, lhs, rhs, destination):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
-        self._set_register(destination, lhs ^ rhs)
+        res = lhs ^ rhs
+        self._set_result_flags(res)
+        self._set_register(destination, res)
 
     def _asl(self, lhs, rhs, destination):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
-        self._set_register(destination, lhs << rhs)
+        res = np.uint64(lhs) << rhs
+        res_sign = (res >> 31) & 1
+        self.cf = (res >> 32) & 1
+        self.of = res_sign != (lhs >> 31) & 1
+        self.zf = res == 0
+        self.nf = res_sign != 0
+        self._set_register(destination, res)
+
+    def _lsl(self, lhs, rhs, destination):
+        self._asl(lhs, rhs, destination)
 
     def _asr(self, lhs, rhs, destination):
         # 2 cycles for arithmetic
         self.clock.add_ticks(2)
-        self._set_register(destination, lhs >> rhs)
+        res = np.int32(lhs) >> rhs
+        res_sign = (res >> 31) & 1
+        # last shifted bit
+        self.cf = ((lhs >> (rhs - 1)) & 1) if rhs > 0 else 0
+        self.of = 0
+        self.zf = res == 0
+        self.nf = res_sign != 0
+        self._set_register(destination, res)
+
+    def _lsr(self, lhs, rhs, destination):
+        # 2 cycles for arithmetic
+        self.clock.add_ticks(2)
+        res = np.uint32(lhs) >> rhs
+        res_sign = (res >> 31) & 1
+        # last shifted bit
+        self.cf = ((lhs >> (rhs - 1)) & 1) if rhs > 0 else 0
+        self.of = 0
+        self.zf = res == 0
+        self.nf = res_sign != 0
+        self._set_register(destination, res)
 
     def _set_mrk(self, value):
         self.renderer.set_mrk(value)
@@ -271,11 +551,11 @@ class Q1Core:
         self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire(bins, bin_index, wait_after)
 
-    def _acquire_weighed(self, bins, bin_index, weight0, weight1, wait_after):
+    def _acquire_weighted(self, bins, bin_index, weight0, weight1, wait_after):
         if not self._is_qrm:
             raise NotImplementedError('instrument type is not QRM')
         self.clock.schedule_rt(self.renderer.time)
-        self.renderer.acquire_weighed(bins, bin_index, weight0, weight1, wait_after)
+        self.renderer.acquire_weighted(bins, bin_index, weight0, weight1, wait_after)
 
     def _acquire_ttl(self, bins, bin_index, enable, wait_after):
         if not self._is_qrm:

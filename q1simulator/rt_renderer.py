@@ -267,10 +267,10 @@ class Renderer:
         self._render(wait_after)
 
     @check_conditional(clear_latched_settings=True)
-    def acquire_weighed(self, acq_index, bin_index, weight0, weight1, wait_after):
+    def acquire_weighted(self, acq_index, bin_index, weight0, weight1, wait_after):
         self._update_settings()
         if self.trace_enabled:
-            self._trace(f'AcquireWeighed {acq_index} {bin_index} {weight0} {weight1}')
+            self._trace(f'AcquireWeighted {acq_index} {bin_index} {weight0} {weight1}')
         if weight0 not in self.acq_weights:
             self._error('ACQ WEIGHT PLAYBACK INDEX INVALID PATH 0')
         elif weight1 not in self.acq_weights:

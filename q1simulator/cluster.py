@@ -18,10 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 class ClusterModule(qc.InstrumentChannel, Q1Module):
-    def __init__(self, root_instrument, name, slot, n_sequencers=6, sim_type=None):
+    def __init__(self, root_instrument, name, slot, n_sequencers=6, sim_type=None,
+                 isa_version: tuple[int, int] | None = None):
         super().__init__(root_instrument, name)
         self._slot = slot
-        super().init_module(n_sequencers, sim_type)
+        super().init_module(n_sequencers, sim_type, isa_version=isa_version)
 
     @property
     def slot_idx(self):
@@ -47,7 +48,7 @@ class Cluster(qc.Instrument):
         'trigger_monitor_latest',
         ]
 
-    def __init__(self, name, modules={}):
+    def __init__(self, name, modules={}, isa_version: tuple[int, int] | None = None):
         check_qblox_instrument_version()
         if qc.Instrument.exist(name):
             logger.info(f"Closing old simulator with same name ({name})")
@@ -70,7 +71,7 @@ class Cluster(qc.Instrument):
         for slot in range(1, 21):
             name = f'module{slot}'
             if slot in modules:
-                module = ClusterModule(self, name, slot, sim_type=modules[slot])
+                module = ClusterModule(self, name, slot, sim_type=modules[slot], isa_version=isa_version)
             else:
                 module = EmptySlot(self, name)
             self.add_submodule(name, module)
@@ -119,11 +120,20 @@ class Cluster(qc.Instrument):
         if not self._modules[slot].present():
             raise Exception(f'No module in slot {slot}')
 
+    def get_sequencer_isa_version(self, slot, seq_nr) -> tuple[int, int]:
+        return self._modules[slot].get_sequencer_isa_version(seq_nr)
+
     def get_sequencer_status(self, slot, seq_nr, timeout=0):
         return self._modules[slot].get_sequencer_status(seq_nr, timeout)
 
     def get_acquisition_status(self, slot, seq_nr, timeout=0):
-        return self.self._modules[slot].get_acquisition_status(seq_nr, timeout)
+        return self._modules[slot].get_acquisition_status(seq_nr, timeout)
+
+    def set_sequencer_registers(self, slot: int, sequencer: int, registers: dict[str, int]):
+        self._modules[slot].set_sequencer_registers(sequencer, registers)
+
+    def get_sequencer_registers(self, slot: int, sequencer: int, registers: list[str] | None):
+        return self._modules[slot].get_sequencer_registers(sequencer, registers)
 
     def arm_sequencer(self, slot: int | None = None, sequencer: int | None = None) -> None:
         if slot is not None:
@@ -149,7 +159,6 @@ class Cluster(qc.Instrument):
                 sequencers.append(module.sequencers[seq_number])
 
         # TODO: run all after starting last with sync_en.
-        print("Run")
         run_sequencers(sequencers)
 
     def stop_sequencer(self, slot: int | None = None, sequencer: int | None = None) -> None:

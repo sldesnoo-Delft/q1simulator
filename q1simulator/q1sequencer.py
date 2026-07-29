@@ -57,8 +57,17 @@ class Q1Sequencer(InstrumentChannel):
         'nco_prop_delay_comp_en',
         ]
 
-    def __init__(self, parent, name, sim_type, idx):
+    def __init__(self, parent, name, sim_type, idx, isa_version: tuple[int, int] | None = None):
         super().__init__(parent, name)
+        if isa_version is not None:
+            if isa_version not in [(1, 0), (2, 0)]:
+                raise Exception(f"Unknown ISA version {isa_version}")
+            self._isa_version = isa_version
+        else:
+            if qblox_version < Version("1.2.0"):
+                self._isa_version = (1, 0)
+            else:
+                self._isa_version = (2, 0)
         self._idx = idx
         self._is_qcm = sim_type in ['QCM', 'QCM-RF', 'Viewer']
         self._is_qrm = sim_type in ['QRM', 'QRM-RF', 'Viewer']
@@ -84,6 +93,7 @@ class Q1Sequencer(InstrumentChannel):
             self.add_parameter(par_name,
                                set_cmd=partial(self._log_set, par_name))
 
+        self.add_parameter('isa_version', get_cmd=self.get_sequencer_isa_version)
         self.add_parameter('nco_phase_offs', set_cmd=self._nco_phase_offs)
         for i in range(2):
             self.add_parameter(f'gain_awg_path{i}', set_cmd=partial(self._gain_awg, path=i))
@@ -137,8 +147,11 @@ class Q1Sequencer(InstrumentChannel):
         self.run_state = 'IDLE'
         self.rt_renderer = Renderer(self.name)
         self.rt_renderer.trace_enabled = self._trace
-        self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm)
+        self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm, isa_version=self._isa_version[0])
         self.reset_trigger_thresholding()
+
+    def get_sequencer_isa_version(self) -> tuple[int, int]:
+        return self._isa_version
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
@@ -385,11 +398,10 @@ class Q1Sequencer(InstrumentChannel):
             info_flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
 
         if qblox_version >= Version("1.2.0"):
-            exit_code = 0
             return SequencerStatus(
                 SequencerStatuses.OKAY,
                 SequencerStates[self.run_state],
-                exit_code,
+                int(self.q1core.exit_code),
                 info_flags,
                 warn_flags,
                 error_flags,
@@ -465,6 +477,28 @@ class Q1Sequencer(InstrumentChannel):
         self.rt_renderer.trigger_events = self._trigger_events
         self.q1core.run()
         self.run_state = 'STOPPED'
+
+    def set_register(
+        self, register: str, value: int, timeout: int = 0, time_poll_res: float = 0.02
+    ) -> None:
+        return self.set_registers({register: value}, timeout, time_poll_res)
+
+    def set_registers(
+        self, registers: dict[str, int], timeout: int = 0, time_poll_res: float = 0.02
+    ) -> None:
+        self.q1core.set_registers(registers)
+
+    def get_register(self, register: str, timeout: int = 0, time_poll_res: float = 0.02) -> int:
+        registers = self.   get_registers([register], timeout, time_poll_res)
+        return registers[register]
+
+    def get_registers(
+        self,
+        registers: list[str] | None = None,
+        timeout: int = 0,
+        time_poll_res: float = 0.02,
+    ) -> dict[str, int]:
+        return self.q1core.get_registers(registers)
 
     def get_acquisitions(self, *, as_numpy: bool = False):
         if not self._is_qrm:
@@ -643,6 +677,14 @@ class Q1Sequencer(InstrumentChannel):
 
     def print_registers(self, reg_nrs=None):
         self.q1core.print_registers(reg_nrs)
+
+    def get_alu_flags(self):
+        return {
+            "ZF": int(self.q1core.zf),
+            "NF": int(self.q1core.nf),
+            "CF": int(self.q1core.cf),
+            "OF": int(self.q1core.of),
+            }
 
 
 @dataclass

@@ -82,7 +82,7 @@ class Q1Module(qc.instrument.InstrumentBase):
     # NOTE: No __init__() !!!
     # This class is used as a mixin. Although quite heavy mixin.
 
-    def init_module(self, n_sequencers=6, sim_type=None):
+    def init_module(self, n_sequencers=6, sim_type=None, isa_version: tuple[int, int] | None = None):
 
         # When using the qblox_instruments ClusterType class,
         # for example ClusterType.CLUSTER_QCM,
@@ -145,7 +145,7 @@ class Q1Module(qc.instrument.InstrumentBase):
         for par_name in sim_params:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
 
-        self.sequencers = [Q1Sequencer(self, f'sequencer{i}', sim_type, i)
+        self.sequencers = [Q1Sequencer(self, f'sequencer{i}', sim_type, i, isa_version=isa_version)
                            for i in range(n_sequencers)]
         for i, seq in enumerate(self.sequencers):
             self.add_submodule(f'sequencer{i}', seq)
@@ -195,6 +195,9 @@ class Q1Module(qc.instrument.InstrumentBase):
     def get_system_error(self):
         return '0,"No error"'
 
+    def get_sequencer_isa_version(self, seq_nr) -> tuple[int, int]:
+        return self.sequencers[seq_nr].get_sequencer_isa_version()
+
     def arm_sequencer(self, sequencer: int | None = None):
         seq_nums = range(len(self.sequencers)) if sequencer is None else (sequencer,)
         for seq_num in seq_nums:
@@ -209,6 +212,12 @@ class Q1Module(qc.instrument.InstrumentBase):
         seq_nums = range(len(self.sequencers)) if sequencer is None else (sequencer,)
         for seq_num in seq_nums:
             self.sequencers[seq_num].stop_sequencer()
+
+    def set_sequencer_registers(self, sequencer: int, registers: dict[str, int]):
+        self.sequencers[sequencer].set_registers(registers)
+
+    def get_sequencer_registers(self, sequencer: int, registers: list[str] | None):
+        return self.sequencers[sequencer].get_registers(registers)
 
     def get_sequencer_status(self, seq_nr: int, timeout: int = 0, timeout_poll_res: float = 0.02):
         return self.sequencers[seq_nr].get_sequencer_status()
