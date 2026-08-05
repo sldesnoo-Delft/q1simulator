@@ -403,15 +403,8 @@ class Q1Core:
         mask = (1 << 32) - 1
         hres = res >> 32
         lres = res & mask
-        if destination_low is None:
-            self.zf = hres == 0
-            self.nf = np.int32(hres) < 0
-        elif destination_high is None:
-            self.zf = lres == 0
-            self.nf = np.int32(lres) < 0
-        else:
-            self.zf = res == 0
-            self.nf = np.int64(res) < 0
+        self.zf = res == 0
+        self.nf = np.int64(res) < 0
         self.cf = 0
         self.of = 0
         if destination_low is not None:

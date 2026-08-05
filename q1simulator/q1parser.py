@@ -217,7 +217,7 @@ class Q1Parser:
                     args, reg_args = self._evaluate_args(mnemonic_args[mnemonic], instr.arglist)
                     instr.args = args
                     instr.reg_args = reg_args
-                    if reg_args and (self.v2 or mnemonic not in ["jmp", "jge", "jlt", "loop"]): # TODO check! @@@@
+                    if reg_args:
                         # 1 cycle for every register. instr and 1st register are loaded in 1 cycle
                         instr.clock_ticks = len(reg_args)
                     else:

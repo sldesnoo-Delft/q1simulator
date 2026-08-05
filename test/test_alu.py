@@ -1,7 +1,14 @@
 from q1simulator import Cluster
-import qcodes as qc
 import numpy as np
 import operator as op
+
+
+def py_to_uint32(value):
+    return np.uint32(np.int64(value))
+
+
+def py_to_int32(value):
+    return np.int32(np.int64(value))
 
 
 def run(cluster, program, waveforms={}, weights={}, acquisitions={},
@@ -38,7 +45,7 @@ def run(cluster, program, waveforms={}, weights={}, acquisitions={},
 
 
 # %%
-def test_operator(operator: str, a: int, b: int, n_dest: int = 1) -> tuple[int, dict[str, int]]:
+def test_operator(operator: str, a: int, b: int, n_dest: int = 1) -> tuple[np.uint32, str]:
     cluster.reset()
 
     dest1 = ",R3" if n_dest > 0 else ""
@@ -103,8 +110,8 @@ def test_add(a: int, b: int):
     print(f"{a:6} + {b:6} = {res} ({flags})")
     ures = np.uint32(res)
     sres = np.int32(ures)
-    sa = np.int32(a)
-    sb = np.int32(b)
+    sa = py_to_int32(a)
+    sb = py_to_int32(b)
     ua = np.uint32(sa)
     ub = np.uint32(sb)
     nf = "N" in flags
@@ -128,8 +135,8 @@ def test_sub(a: int, b: int):
     print(f"{a:6} - {b:6} = {res} ({flags})")
     ures = np.uint32(res)
     sres = np.int32(ures)
-    sa = np.int32(a)
-    sb = np.int32(b)
+    sa = py_to_int32(a)
+    sb = py_to_int32(b)
     ua = np.uint32(sa)
     ub = np.uint32(sb)
     nf = "N" in flags
@@ -155,8 +162,8 @@ def test_cmp(a: int, b: int):
     print(f"{a:6} - {b:6} = {res} ({flags})")
     ures = np.uint32(res)
     sres = np.int32(ures)
-    sa = np.int32(a)
-    sb = np.int32(b)
+    sa = py_to_int32(a)
+    sb = py_to_int32(b)
     ua = np.uint32(sa)
     ub = np.uint32(sb)
     nf = "N" in flags
@@ -185,8 +192,8 @@ def test_mul16(a: int, b: int, signed: bool):
     else:
         mask = (1 << 32) - 1
         print(f"{a & mask:6} * {b & mask:6} = {ures} ({flags})")
-    sa = np.int16(np.int32(a))
-    sb = np.int16(np.int32(b))
+    sa = np.int16(py_to_int32(a))
+    sb = np.int16(py_to_int32(b))
     ua = np.uint16(sa)
     ub = np.uint16(sb)
     nf = "N" in flags
@@ -219,36 +226,37 @@ def test_mul32(a: int, b: int, signed: bool, hl: str = ""):
         ures = np.uint32(res)
         sres = np.int32(ures)
 
+    part = f"[{hl}]" if hl else ""
     if signed:
-        print(f"{a:6} * {b:6} = {sres} ({flags})")
+        print(f"{a:6} * {b:6} {part}= {sres} ({flags})")
     else:
         mask = (1 << 64) - 1
-        print(f"{a & mask:6} * {b & mask:6} = {ures} ({flags})")
-    sa = np.int32(a)
-    sb = np.int32(b)
+        print(f"{a & mask:6} * {b & mask:6} {part} = {ures} ({flags})")
+    sa = py_to_int32(a)
+    sb = py_to_int32(b)
     ua = np.uint32(sa)
     ub = np.uint32(sb)
     nf = "N" in flags
     zf = "Z" in flags
     cf = "C" in flags
     of = "O" in flags
-    assert (res == 0) == zf
+    expected_signed = np.int64(sa) * sb
+    expected_unsigned = np.uint64(ua) * ub
+    assert (expected_signed == 0) == zf
+    assert (expected_signed < 0) == nf
     if signed:
-        expected = np.int64(sa) * sb
         if hl == "l":
-            expected = np.int32(expected)
+            expected_signed = np.int32(expected_signed)
         elif hl == "h":
-            expected = expected >> 32
-        assert sres == expected
-        assert (sres < 0) == nf
+            expected_signed = expected_signed >> 32
+        assert sres == expected_signed
         assert ((a * b >= (1 << 63)) or (a * b < -(1 << 63))) == of
     else:
-        expected = np.uint64(ua) * ub
         if hl == "l":
-            expected = np.uint32(expected)
+            expected_unsigned = np.uint32(expected_unsigned)
         elif hl == "h":
-            expected = expected >> 32
-        assert ures == expected
+            expected_unsigned = expected_unsigned >> 32
+        assert ures == expected_unsigned
         assert (np.uint64(ua) * ub >= (1 << 64)) == cf
 
 
@@ -264,7 +272,7 @@ def test_bitwise(a, b, operator):
         return np.int32(np.uint32(a & mask)) >> b
 
     res, flags = test_operator(operator, a, b)
-    ures = np.uint32(np.int64(res))
+    ures = np.uint32(res)
     sres = np.int32(res)
 
     print(f"{a:08X} {operator:3} {b:08X} = {ures:08X} ({flags})")
@@ -292,15 +300,15 @@ def test_bitwise(a, b, operator):
     assert (sres < 0) == nf
 
     if operator in ["asl", "lsl"]:
-        sa = np.int32(np.int64(a))
+        sa = py_to_int32(a)
         first_out = (sa >> 31) & 1
         last_out = (sa >> (32-b)) & 1
         sign_bit = (sa >> (31-b)) & 1
         assert cf == (last_out != 0)
         assert of == (sign_bit != first_out)
-    elif operator in ["asr", "asl"]:
-        sa = np.int32(np.int64(a))
-        last_out = (sa >> (32-b)) & 1
+    elif operator in ["asr", "lsr"]:
+        sa = py_to_int32(a)
+        last_out = (sa >> (b-1)) & 1
         assert cf == (last_out != 0)
         assert of == 0
     else:
@@ -388,6 +396,9 @@ test_mul32(-30_000, 31_000, signed=True, hl="l")
 test_mul32(300_000, -10_000_000, signed=True, hl="l")
 test_mul32(30_000, -31_000, signed=True, hl="h")
 test_mul32(-300_000, 10_000_000, signed=True, hl="h")
+test_mul32(3, 4, signed=True, hl="h")  # not zero, but 0 in high 32 bit
+test_mul32(0xFFFF0008, 0x4000_0000, signed=True, hl="l")  # negative, but 0 in low 32 bit.
+test_mul32(0xFFF00008, 0x0001_0000, signed=True, hl="l")  # negative, but > 0 in low 32 bit.
 
 test_mul32(30_000, 31_000, signed=False, hl="l")
 test_mul32(300_000, 10_000_000, signed=False, hl="l")
