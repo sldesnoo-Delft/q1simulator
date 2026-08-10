@@ -102,6 +102,7 @@ class Renderer:
         self.acquisitions = {}
         self.ttl_acq_auto_bin_incr_en = False
         self.nco_frequency = 0.0
+        self.real_mode_en = False
         self.mod_en_awg = False
         self.mixer_gain_ratio = 1.0
         self.mixer_phase_offset_degree = 0.0
@@ -498,17 +499,22 @@ class Renderer:
             nco = np.exp(1j*phase)
             # Multiplication factor as specified when modulating.
             nco *= np.sqrt(.5)
-            data0 = nco.real*path[0] - nco.imag*path[1]
-            if self.mixer_phase_offset_degree != 0.0:
-                phase_offset = self.mixer_phase_offset_degree/180*np.pi
-                nco *= np.exp(1j*phase_offset)
-            data1 = nco.imag*path[0] + nco.real*path[1]
-            if self.mixer_gain_ratio > 1.0:
-                data0 *= 1/self.mixer_gain_ratio
-            if self.mixer_gain_ratio < 1.0:
-                data1 *= self.mixer_gain_ratio
-            data0 = data0.astype(np.int16)
-            data1 = data1.astype(np.int16)
+            if not self.real_mode_en:
+                data0 = nco.real*path[0] - nco.imag*path[1]
+                if self.mixer_phase_offset_degree != 0.0:
+                    phase_offset = self.mixer_phase_offset_degree/180*np.pi
+                    nco *= np.exp(1j*phase_offset)
+                data1 = nco.imag*path[0] + nco.real*path[1]
+                if self.mixer_gain_ratio > 1.0:
+                    data0 *= 1/self.mixer_gain_ratio
+                if self.mixer_gain_ratio < 1.0:
+                    data1 *= self.mixer_gain_ratio
+                data0 = data0.astype(np.int16)
+                data1 = data1.astype(np.int16)
+            else:
+                data0 = nco.real*path[0]
+                data0 = data0.astype(np.int16) + path[1]
+                data1 = None
         else:
             data0 = path[0]
             data1 = path[1]

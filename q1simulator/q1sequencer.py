@@ -105,6 +105,8 @@ class Q1Sequencer(InstrumentChannel):
         self.add_parameter('mixer_corr_gain_ratio', set_cmd=self._set_mixer_gain_ratio)
         self.add_parameter('mixer_corr_phase_offset_degree', set_cmd=self._set_mixer_phase_offset_degree)
 
+        self.add_parameter("real_mode_en", set_cmd=self._set_real_mode_en)
+
         n_out_ch = 4 if self._is_qcm else 2
         if self._is_rf:
             n_out_ch //= 2
@@ -166,6 +168,9 @@ class Q1Sequencer(InstrumentChannel):
     def _offset_awg(self, offset, path):
         value = int(offset*32767)
         self.rt_renderer.offset_awg_path(value, path)
+
+    def _set_real_mode_en(self, enable: bool):
+        self.rt_renderer.real_mode_en = enable
 
     def _set_mod_en_awg(self, value):
         logger.debug(f'{self.name}: mod_en_awg={value}')

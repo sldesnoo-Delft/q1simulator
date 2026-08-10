@@ -3,8 +3,10 @@ All notable changes to Q1Simulator will be documented in this file.
 
 ## \[1.2.0] - @@@@
 
+- Compatible with qblox-instruments v1.2.1
 - Added Q1ASM ISA v2 (without LINQ Feedback).
 - Added get/set registers.
+- Added `real_mode_en`.
 
 ## \[1.1.1] - 2026-03-03
 
