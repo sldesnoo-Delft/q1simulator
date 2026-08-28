@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.2.1] - @@@@ NOT RELEASED
+
+- Added check on number of instructions.
+
 ## \[1.2.0] - 2026-08-28
 
 - Compatible with qblox-instruments v1.2.2
