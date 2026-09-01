@@ -26,6 +26,7 @@ dependencies = [
     "matplotlib",
     "qtpy",
     "pyqtgraph",
+    "pyqt6"
 ]
 
 [project.urls]
