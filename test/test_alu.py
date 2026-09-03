@@ -28,7 +28,7 @@ def run(cluster, program, waveforms={}, weights={}, acquisitions={},
     qrm.arm_sequencer(0)
 
     cluster.start_sequencer()
-    seq.get_sequencer_status()
+    seq.get_sequencer_status(timeout=1.0)
     try:
         flags = seq.get_alu_flags()
         sflags = ""
@@ -83,7 +83,7 @@ def test_operator(operator: str, a: int, b: int, n_dest: int = 1) -> tuple[np.ui
               registers={"R1": a, "R2": b},
               out_registers=["R3", "R4"] + [f"R{i+10}" for i in range(len(jumps))])
     regs = res["Regs"]
-    
+
     for i, cj in enumerate(jumps, 10):
         value = regs[f"R{i}"]
         assert value in [0, 1]
