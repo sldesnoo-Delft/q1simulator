@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from functools import partial
 from typing import Iterator, Iterable
@@ -17,9 +18,11 @@ from qblox_instruments import (
     SequencerStates,
     )
 
+from .event_distributor import EventDistributor
 from .q1core import Q1Core
-from .rt_renderer import Renderer, MockDataEntry
 from .qblox_version import Version, qblox_version
+from .scheduler import Scheduler, Task
+from .rt_renderer import Renderer, MockDataEntry
 
 
 logger = logging.getLogger(__name__)
@@ -27,12 +30,11 @@ logger = logging.getLogger(__name__)
 MockDataType = Iterable[MockDataEntry]
 
 
-class Q1Sequencer(InstrumentChannel):
+class Q1Sequencer(InstrumentChannel, Task):
 
     # only logged
     _seq_log_only_parameters = [
         # -- only printed:
-        'sync_en',
         'marker_ovr_en',
         'marker_ovr_value',
         'cont_mode_en_awg_path0',
@@ -57,7 +59,8 @@ class Q1Sequencer(InstrumentChannel):
         'nco_prop_delay_comp_en',
         ]
 
-    def __init__(self, parent, name, sim_type, idx, isa_version: tuple[int, int] | None = None):
+    def __init__(self, parent, name, sim_type, idx, scheduler: Scheduler,
+                 isa_version: tuple[int, int] | None = None):
         super().__init__(parent, name)
         if isa_version is not None:
             if isa_version not in [(1, 0), (2, 0)]:
@@ -69,6 +72,8 @@ class Q1Sequencer(InstrumentChannel):
             else:
                 self._isa_version = (2, 0)
         self._idx = idx
+        self._scheduler = scheduler
+        self._event_distributor = scheduler.event_distributor
         self._is_qcm = sim_type in ['QCM', 'QCM-RF', 'Viewer']
         self._is_qrm = sim_type in ['QRM', 'QRM-RF', 'Viewer']
         self._is_rf = sim_type in ['QCM-RF', 'QRM-RF']
@@ -94,6 +99,7 @@ class Q1Sequencer(InstrumentChannel):
                                set_cmd=partial(self._log_set, par_name))
 
         self.add_parameter('isa_version', get_cmd=self.get_sequencer_isa_version)
+        self.add_parameter('sync_en', set_cmd=self._sync_en)
         self.add_parameter('nco_phase_offs', set_cmd=self._nco_phase_offs)
         for i in range(2):
             self.add_parameter(f'gain_awg_path{i}', set_cmd=partial(self._gain_awg, path=i))
@@ -147,9 +153,10 @@ class Q1Sequencer(InstrumentChannel):
         self.output_selected_path = ['off'] * 4
         self._paths_used = [False, False]
         self.run_state = 'IDLE'
-        self.rt_renderer = Renderer(self.name)
+        self.rt_renderer = Renderer(self.name, self._event_distributor)
         self.rt_renderer.trace_enabled = self._trace
-        self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm, isa_version=self._isa_version[0])
+        self.q1core = Q1Core(self.name, self.rt_renderer, self._is_qrm, self._event_distributor,
+                             isa_version=self._isa_version[0])
         self.reset_trigger_thresholding()
 
     def get_sequencer_isa_version(self) -> tuple[int, int]:
@@ -157,6 +164,10 @@ class Q1Sequencer(InstrumentChannel):
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
+
+    def _sync_en(self, value):
+        self._sync_enabled = value
+        self._event_distributor.set_sequencer_sync_en(self.name, self._sync_enabled)
 
     def _nco_phase_offs(self, degrees):
         self.rt_renderer.set_ph((degrees / 360) % 1 * 1e9)
@@ -392,35 +403,49 @@ class Q1Sequencer(InstrumentChannel):
             self.rt_renderer.set_mock_data(bin_num, data)
 
     def get_sequencer_status(self, timeout: int = 0, timeout_poll_res: float = 0.02):
-        info_flags = []
-        warn_flags = []
-        error_flags = [
-            SequencerStatusFlags[flag.replace(' ', '_')]
-            for flag in self.q1core.errors | self.rt_renderer.errors
-            ]
-        log = []
-        if self._is_qrm:
-            info_flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
+        try:
+            if timeout:
+                expiration_time = time.perf_counter() + timeout * 60.0
+                while not self._scheduler.join_sequencer(self.name):
+                    if time.perf_counter() > expiration_time:
+                        raise TimeoutError(f"Sequencer {self.name}")
+                    timeout_poll_res = 0.1
+                    time.sleep(timeout_poll_res)
+            else:
+                self._scheduler.join_sequencer(self.name)
 
-        if qblox_version >= Version("1.2.0"):
-            return SequencerStatus(
-                SequencerStatuses.OKAY,
-                SequencerStates[self.run_state],
-                int(self.q1core.exit_code),
-                info_flags,
-                warn_flags,
-                error_flags,
-                log,
-            )
-        else:
-            return SequencerStatus(
-                SequencerStatuses.OKAY,
-                SequencerStates[self.run_state],
-                info_flags,
-                warn_flags,
-                error_flags,
-                log,
-            )
+            info_flags = []
+            warn_flags = []
+            error_flags = [
+                SequencerStatusFlags[flag.replace(' ', '_')]
+                for flag in self.q1core.errors | self.rt_renderer.errors
+                ]
+            log = []
+            if self._is_qrm:
+                info_flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
+
+            if qblox_version >= Version("1.2.0"):
+                return SequencerStatus(
+                    SequencerStatuses.OKAY,
+                    SequencerStates[self.run_state],
+                    int(self.q1core.exit_code),
+                    info_flags,
+                    warn_flags,
+                    error_flags,
+                    log,
+                )
+            else:
+                return SequencerStatus(
+                    SequencerStatuses.OKAY,
+                    SequencerStates[self.run_state],
+                    info_flags,
+                    warn_flags,
+                    error_flags,
+                    log,
+                )
+        except KeyboardInterrupt:
+            self._event_distributor.abort()
+            raise
 
     def get_acquisition_status(self, timeout: int = 0, timeout_poll_res: float = 0.02, check_seq_state: bool = True):
         if not self._is_qrm:
@@ -465,23 +490,35 @@ class Q1Sequencer(InstrumentChannel):
         logger.info(f"Calibrate sideband {self.name}")
 
     def arm_sequencer(self):
+        self._event_distributor.set_sequencer_sync_en(self.name, self._sync_enabled)
+        self._event_distributor.arm_sequencer(self.name, self._sync_enabled)
         self.run_state = 'ARMED'
 
     def start_sequencer(self):
         if self.run_state != 'ARMED':
             raise Exception(f"Sequencer not armed. state = {self.run_state}")
-        self.run()
+        self._event_distributor.start_sequencer(self.name)
+        self._scheduler.start_sequencer(self)
 
     def stop_sequencer(self):
-        self.run_state = 'STOPPED'
+        if self.run_state in ["RUNNING", "ARMED"]:
+            self.abort()
+        self.run_state = "STOPPED"
 
     def run(self):
-        self.run_state = 'RUNNING'
-        self.rt_renderer.reset()
-        self._set_rt_mock_data()
-        self.rt_renderer.trigger_events = self._trigger_events
-        self.q1core.run()
-        self.run_state = 'STOPPED'
+        try:
+            self.run_state = 'RUNNING'
+            self.rt_renderer.reset()
+            self._set_rt_mock_data()
+            self.rt_renderer.trigger_events = self._trigger_events
+            self.q1core.run()
+            self.run_state = 'STOPPED'
+        except (Exception, KeyboardInterrupt):
+            logger.error(f"Exception in {self.name}", exc_info=True)
+
+    def abort(self):
+        self.q1core.abort = True
+        self._event_distributor.abort_sequencer(self.name)
 
     def set_register(
         self, register: str, value: int, timeout: int = 0, time_poll_res: float = 0.02

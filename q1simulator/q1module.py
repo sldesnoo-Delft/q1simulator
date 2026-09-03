@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 
 from .channel_data import MarkerOutput, SampledOutput
 from .q1sequencer import Q1Sequencer
+from .scheduler import Scheduler
 
 from qblox_instruments import InstrumentType
 
@@ -82,7 +83,8 @@ class Q1Module(qc.instrument.InstrumentBase):
     # NOTE: No __init__() !!!
     # This class is used as a mixin. Although quite heavy mixin.
 
-    def init_module(self, n_sequencers=6, sim_type=None, isa_version: tuple[int, int] | None = None):
+    def init_module(self, n_sequencers: int, sim_type: str, scheduler: Scheduler,
+                    isa_version: tuple[int, int] | None = None):
 
         # When using the qblox_instruments ClusterType class,
         # for example ClusterType.CLUSTER_QCM,
@@ -100,6 +102,8 @@ class Q1Module(qc.instrument.InstrumentBase):
 
         if not (self._is_qcm or self._is_qrm):
             raise ValueError(f'Unknown sim_type: {sim_type}')
+
+        self._scheduler = scheduler
 
         sim_params = []
         sim_params += self._module_parameters
@@ -145,8 +149,10 @@ class Q1Module(qc.instrument.InstrumentBase):
         for par_name in sim_params:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
 
-        self.sequencers = [Q1Sequencer(self, f'sequencer{i}', sim_type, i, isa_version=isa_version)
-                           for i in range(n_sequencers)]
+        self.sequencers = [
+            Q1Sequencer(self, f'sequencer{i}', sim_type, i, scheduler, isa_version=isa_version)
+            for i in range(n_sequencers)
+            ]
         for i, seq in enumerate(self.sequencers):
             self.add_submodule(f'sequencer{i}', seq)
 
@@ -220,11 +226,11 @@ class Q1Module(qc.instrument.InstrumentBase):
         return self.sequencers[sequencer].get_registers(registers)
 
     def get_sequencer_status(self, seq_nr: int, timeout: int = 0, timeout_poll_res: float = 0.02):
-        return self.sequencers[seq_nr].get_sequencer_status()
+        return self.sequencers[seq_nr].get_sequencer_status(timeout, timeout_poll_res)
 
     def get_acquisition_status(self, sequencer: int, timeout: int = 0,
                                timeout_poll_res: float = 0.02, check_seq_state: bool = True):
-        return self.sequencers[sequencer].get_acquisition_status()
+        return self.sequencers[sequencer].get_acquisition_status(timeout, timeout_poll_res)
 
     def get_waveforms(self, sequencer: int, *, as_numpy: bool = False):
         return self.sequencers[sequencer].get_waveforms(as_numpy=as_numpy)

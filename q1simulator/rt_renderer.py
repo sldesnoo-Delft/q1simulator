@@ -11,8 +11,8 @@ from numpy.typing import NDArray
 
 from .analogue_filter import AnalogueFilter
 from .channel_data import MarkerOutput, SampledOutput
+from .event_distributor import EventDistributor, TriggerEvent, FeedbackEvent
 from .q1configuration import Q1Configuration
-from .triggers import TriggerEvent
 
 
 logger = logging.getLogger(__name__)
@@ -80,10 +80,15 @@ def check_conditional(clear_latched_settings=False):
     def _check_conditional(func):
         @wraps(func)
         def func_wrapper(self, *args, **kwargs):
-            if self.skip_rt:
-                if clear_latched_settings:
-                    self._clear_latched_settings()
-                self._else_wait()
+            if self.condition_enabled:
+                self._process_events()
+                if self.skip_rt:
+                    if clear_latched_settings:
+                        self._clear_latched_settings()
+
+                    self._else_wait()
+                else:
+                    func(self, *args, **kwargs)
             else:
                 func(self, *args, **kwargs)
         return func_wrapper
@@ -93,8 +98,9 @@ def check_conditional(clear_latched_settings=False):
 class Renderer:
     _analogue_filter: AnalogueFilter | None = None
 
-    def __init__(self, name):
+    def __init__(self, name: str, event_distributor: EventDistributor):
         self.name = name
+        self._event_distributor = event_distributor
         self._max_render_time = 2_000_000
         self.wavedict_float = {}
         self.wavedict = {}
@@ -110,8 +116,8 @@ class Renderer:
         self.next_settings = Settings()
         self.enabled_paths: list[bool] = [False, False]
         self.trace_enabled: bool = False
+        self._skip_wait_sync: bool = True
         self.reset()
-        self.skip_wait_sync: bool = True
         self.acq_trigger_value: bool | None = None
         self.forced_condition_value: int | None = None
         self.threshold_count = np.full(15, 0, dtype=np.uint16)
@@ -122,6 +128,7 @@ class Renderer:
         # start with the old settings / values set via qcodes.
         self.settings = deepcopy(self.next_settings)
         self.time = 0
+        self.no_render_till_sync = self._skip_wait_sync
         # Qblox sequencer has 3 different phase registers
         self.nco_phase_offset = 0.0
         self.relative_phase = 0.0
@@ -135,16 +142,25 @@ class Renderer:
         self.marker_out = [list() for _ in range(4)]  # a list per marker
         self.acq_times = {i: [] for i in self.acquisitions}
         self.acq_buffer = AcqBuffer()
-        self.acq_trigger_events = []
         self.acq_ttl_start = None
         self.mock_data = {}
         self.errors = set()
         self.latch_enabled = False
         self.latch_regs = np.zeros(15, dtype=np.uint16)
-        self.trigger_events: list[TriggerEvent] = []
+        self.thresholded_triggers = np.zeros(15, dtype=np.uint16)
+        self.condition_enabled = False
         self.skip_rt = False
         self.else_wait = 0
         self._trace(f"---Reset {self.name}---")
+
+    @property
+    def skip_wait_sync(self):
+        return self._skip_wait_sync
+
+    @skip_wait_sync.setter
+    def skip_wait_sync(self, value):
+        self._skip_wait_sync = value
+        self.no_render_till_sync = self._skip_wait_sync
 
     def gain_awg_path(self, gain, path):
         self.next_settings.awg_gain[path] = gain
@@ -314,52 +330,30 @@ class Renderer:
         self._render(time)
 
     def wait_sync(self, wait_after):
-        if self.skip_wait_sync:
-            return
-        self._render(wait_after)
+        self._trace(f"wait_sync {wait_after}")
+        new_time = self._event_distributor.wait_sync_sequencer(self.name, self.time)
+        self._trace(f"-- wait_sync waited: {new_time - self.time} + {wait_after}")
+        sync_time = new_time - self.time
+        self._render(sync_time + wait_after)
+        self.no_render_till_sync = False
 
     def set_cond(self, enable, mask, op, else_wait):
+        # Update triggers
+        self._process_events()
+        op_names = ["OR", "NOR", "AND", "NAND", "XOR", "XNOR"]
+        logger.debug(f'set_cond {enable}, {mask}, {op} ({op_names[op]}), {else_wait}')
+        self.condition_enabled = enable
+        self.else_wait = else_wait
         if not enable:
             self._trace('Cond disabled')
+            self.condition_enabled = False
             self.skip_rt = False
             return
-        self._process_triggers()
-        if self.forced_condition_value is not None:
-            # forced condition value is 1 bit
-            state = self.forced_condition_value == 1
-            match = state if op in [0, 2, 4] else not state
-            self._trace(f'Cond {match} {state}')
-            self.skip_rt = not match
-            self.else_wait = else_wait
-            return
 
+        self.condition_op = op
         # use numpy uint8 arrays to get array of bits
-        mask_ar = np.unpackbits([np.uint8(mask >> 8), np.uint8(mask & 0xFF)])[:0:-1]
-        state = ((self.latch_regs >= self.threshold_count) ^ self.threshold_invert) & mask_ar
-        bits_set = np.sum(state)
-        bits_mask = np.sum(mask_ar)
-        if op == 0:  # OR
-            match = bits_set != 0
-        elif op == 1:  # NOR
-            match = bits_set == 0
-        elif op == 2:  # AND
-            match = bits_set == bits_mask
-        elif op == 3:  # NAND
-            match = bits_set != bits_mask
-        elif op == 4:  # XOR
-            match = (bits_set % 2) == 1
-        elif op == 5:  # XNOR
-            match = (bits_set % 2) == 0
-        else:
-            raise Exception(f'Unknown operator {op}')
-        logger.debug(f'set_cond 1, {mask}, {op}, {else_wait}')
-        logger.debug(f'latches: {self.latch_regs}')
-        logger.debug(f'mask:    {mask_ar}')
-        logger.debug(f'state:   {state}')
-        logger.debug(f'cond:    {match}')
-        self._trace(f'Cond {match} {state}')
-        self.skip_rt = not match
-        self.else_wait = else_wait
+        self.condition_mask = np.unpackbits([np.uint8(mask >> 8), np.uint8(mask & 0xFF)])[:0:-1]
+        self._evaluate_condition()
 
     def _else_wait(self, *args, **kwargs):
         self._render(self.else_wait)
@@ -367,21 +361,50 @@ class Renderer:
     def set_latch_en(self, enable, wait_after):
         if self.trace_enabled:
             self._trace(f'Latch {"on" if enable else "off"}')
-        self._process_triggers()
+        self._process_events()
         self.latch_enabled = enable
         self._render(wait_after)
 
     def latch_rst(self, wait):
         if self.trace_enabled:
             self._trace(f'Latch reset {wait}')
-        self._process_triggers()
+        self._process_events()
         self.latch_regs[:] = 0
+        self._update_trigger_thresholds()
         self._render(wait)
 
+    def fb_acq_iq_id(self, event_id, wait_after):
+        ...
+
+    def fb_acq_iq_shift(self, rshift, wait_after):
+        ...
+
+    def fb_acq_tb_id(self, event_id, wait_after):
+        ...
+
+    def fb_acq_tb_cfg(self, write_combine, bit_pos, length, wait_after):
+        ...
+
+    def fb_acq_tb_valid(self, valid, wait_after):
+        ...
+
+    # def fb_acq_tb_extra(self, valid, data, wait_after):
+    #     ... # Not implemented
+
+    def fb_acq_tb_mock(self, enable, valid, data, wait_after):
+        ...
+
+    def fb_com_data(self, event_id, data, wait_after):
+        ...
+
+    def fb_com_cfg(self, write_combine, bit_pos, length, wait_after):
+        ...
+
+    # def fb_com_extra(self, valid, data, wait_after):
+    #     ... # Not implemented
+
     def sim_trigger(self, addr, value):
-        # addresses 1..15. Register index (bits) 0..14!
-        index = int(addr)-1
-        self.latch_regs[index] += int(value)
+        self._process_trigger(TriggerEvent(self.time, 0, int(addr), int(value)))
 
     @property
     def max_render_time(self):
@@ -445,7 +468,7 @@ class Renderer:
         pending.relative_phase = None
         pending.frequency = None
 
-    def _render_marker(self, old_marker, new_marker):
+    def _render_marker(self, old_marker, new_marker): # @@@ TODO skip wait sync
         for i in range(4):
             m = 1 << i
             m_old = (old_marker & m) != 0
@@ -469,6 +492,9 @@ class Renderer:
         t_start = self.time
         t_end = t_start + int(time)
         self.time = t_end
+
+        if self.no_render_till_sync:
+            return
 
         # stop rendering when there is too much data
         if t_start > self.max_render_time:
@@ -522,15 +548,74 @@ class Renderer:
         self.out0.append(data0)
         self.out1.append(data1)
 
-    def _process_triggers(self):
-        t = self.time
-        # TODO Refactor trigger distribution. Request triggers for interval.
-        while len(self.trigger_events) > 0 and self.trigger_events[0].time <= t:
-            trigger = self.trigger_events.pop(0)
-            if self.latch_enabled:
-                index = trigger.addr-1
-                self.latch_regs[index] += trigger.state
-                self._trace(f'Latch reg {index} {trigger.state:+d} -> {self.latch_regs[index]}')
+    def _process_events(self):
+        while event := self._event_distributor.get_event(self.name, self.time):
+            if isinstance(event, FeedbackEvent):
+                self._process_feedback_event(event)
+            elif isinstance(event, TriggerEvent):
+                self._process_trigger(event)
+            else:
+                raise Exception(f"Unknown event type {event}")
+
+    def _process_feedback_event(self, fb_event: FeedbackEvent):
+        ...
+        TODO
+
+    def _process_trigger(self, trigger: TriggerEvent):
+        if not self.latch_enabled:
+            return
+        index = trigger.address-1
+        self.latch_regs[index] += trigger.state
+        self._trace(f'Latch reg {index} {trigger.state:+d} -> {self.latch_regs[index]}')
+
+        if trigger.state:
+            self._update_trigger_thresholds()
+
+    def _update_trigger_thresholds(self):
+        self.thresholded_triggers = (self.latch_regs >= self.threshold_count) ^ self.threshold_invert
+        if self.condition_enabled:
+            self._evaluate_condition()
+
+    def _evaluate_condition(self):
+        """
+        Evaluate condition.
+        This is done when conditions are being enabled and when triggers are received when condition is enabled.
+        """
+        state = self.thresholded_triggers & self.condition_mask
+        op = self.condition_op
+
+        if self.forced_condition_value is not None:
+            # forced condition value is 1 bit
+            state = self.forced_condition_value == 1
+            match = state if op in [0, 2, 4] else not state
+            self._trace(f'Cond {match} {state}')
+            skip_rt = not match
+            return skip_rt
+
+        bits_set = np.sum(state)
+        bits_mask = np.sum(self.condition_mask)
+        if op == 0:  # OR
+            match = bits_set != 0
+        elif op == 1:  # NOR
+            match = bits_set == 0
+        elif op == 2:  # AND
+            match = bits_set == bits_mask
+        elif op == 3:  # NAND
+            match = bits_set != bits_mask
+        elif op == 4:  # XOR
+            match = (bits_set % 2) == 1
+        elif op == 5:  # XNOR
+            match = (bits_set % 2) == 0
+        else:
+            raise Exception(f'Unknown operator {op}')
+        logger.debug(f'latches:     {self.latch_regs}')
+        logger.debug(f'thresholded: {self.thresholded_triggers}')
+        logger.debug(f'mask:        {self.condition_mask}')
+        logger.debug(f'state:       {state}')
+        logger.debug(f'cond:        {match}')
+        self._trace(f'Cond {match} {state}')
+        self.skip_rt = not match
+
 
     def _get_acq_data(self, acq_index, default):
         mock_data_iter = self.mock_data.get(acq_index, None)
@@ -600,9 +685,8 @@ class Renderer:
                 trigger_state = state ^ acq_conf.trigger_invert
             else:
                 trigger_state = self.acq_trigger_value
-            # TODO also add to trigger events. Part of TriggerDistributor redesign.
-            # FIXME: own trigger is not counted.
-            self.acq_trigger_events.append(TriggerEvent(acq_conf.trigger_addr, t_end, trigger_state))
+
+            self._event_distributor.emit_trigger(self.name, t_end, acq_conf.trigger_addr, trigger_state)
             self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
 
     def _add_acquisition_ttl(self, acq_index, bin_index, start, stop):
@@ -636,7 +720,7 @@ class Renderer:
             else:
                 trigger_state = self.acq_trigger_value
             # TODO: use mock data to generate multiple triggers in interval.
-            self.acq_trigger_events.append(TriggerEvent(acq_conf.trigger_addr, t_end, trigger_state))
+            self._event_distributor.emit_trigger(self.name, t_end, acq_conf.trigger_addr, trigger_state)
             self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
 
     def _trace(self, msg):
@@ -674,7 +758,10 @@ class Renderer:
                 continue
             label = "IQ"[i]
             out = [self.out0, self.out1][i]
-            out = scaling * np.concatenate(out)
+            if len(out) > 0:
+                out = scaling * np.concatenate(out)
+            else:
+                out = np.zeros(1)
             out = time_window(out, t_min, t_max)
             if analogue_filter:
                 sr = _filter.sr

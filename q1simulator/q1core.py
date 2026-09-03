@@ -5,6 +5,7 @@ import logging
 import numpy as np
 
 from .q1parser import Q1Parser
+from .event_distributor import EventDistributor
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +27,25 @@ class Illegal(Exception):
     pass
 
 
-class Q1Core:
+def update_rt(func):
+    def wrapper(self, *args, **kwargs):
+        self.clock.schedule_rt(self.renderer.time)
+        func(self, *args, **kwargs)
+        rt_time = self.renderer.time
+        if rt_time - self._last_rt_update > 1000:
+            self.event_distributor.set_sequencer_time(self.name, self.renderer.time)
+    return wrapper
 
-    def __init__(self, name, renderer, is_qrm, isa_version: int = 1):
+
+class Q1Core:
+    max_instructions_qcm = 16384
+    max_instructions_qrm = 12288
+
+    def __init__(self, name, renderer, is_qrm, event_distributor: EventDistributor,
+                 isa_version: int = 1):
         self.name = name
         self.renderer = renderer
+        self.event_distributor = event_distributor
         self._is_qrm = is_qrm
         self.max_core_cycles = 10_000_000
         self.skip_loops = ("_start", )
@@ -38,6 +53,9 @@ class Q1Core:
         self.lines = []
         self.instructions = []
         self.iptr = 0
+        self.abort = False
+        self._last_rt_update = 0
+        self.exit_code = -1
         self.errors = set()
         self.v2 = isa_version == 2
         if self.v2:
@@ -54,6 +72,9 @@ class Q1Core:
     def load(self, program):
         parser = Q1Parser(self.v2)
         self.lines, self.instructions = parser.parse(program)
+        max_instructions = Q1Core.max_instructions_qrm if self._is_qrm else Q1Core.max_instructions_qcm
+        if len(self.lines) > max_instructions:
+            raise Exception(f"Program too big for instruction memory. {len(self.lines)} > {max_instructions}.")
 
     def get_used_triggers(self) -> int:
         '''
@@ -71,6 +92,8 @@ class Q1Core:
         return res
 
     def run(self):
+        self.abort = False
+        self._last_rt_update = 0
         self.errors = set()
         self.exit_code = -1
         self.iptr = 0
@@ -121,6 +144,8 @@ class Q1Core:
                 if cntr >= self.max_core_cycles:
                     raise Abort('Core cycle limited exceeded',
                                 'FORCED STOP')
+                if self.abort:
+                    raise Abort('Stop requested', 'FORCED STOP')
         except Halt as ex:
             rt_time_us = self.renderer.time / 1000
             self.exit_code = ex.exit_code
@@ -135,7 +160,7 @@ class Q1Core:
             self._error(ex.args[1])
         except Exception:
             self._print_error_msg('Exception', instr, cntr)
-            self._error('OOPS!!')
+            self._error("UNKNOWN")
             raise
         finally:
             np.seterr(**orig_err_settings)
@@ -192,143 +217,111 @@ class Q1Core:
         raise Illegal('illegal instruction')
 
     def _stop(self, exit_code: int = 0):
+        self.event_distributor.stop_sequencer(self.name)
         raise Halt('stop instruction', exit_code=exit_code)
 
     def _nop(self):
         pass
 
-    def _jmp(self, label):
-        # 3 cycles for jump
-        self.clock.add_ticks(3)
-        self.iptr = label
-
-    def _jz(self, label):
-        if self.zf:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jnz(self, label):
-        if not self.zf:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jo(self, label):
-        if self.of:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jno(self, label):
-        if not self.of:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _js(self, label):
-        if self.nf:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jns(self, label):
-        if not self.nf:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jg(self, label):
-        if not self.zf and (self.nf == self.of):
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jge_v2(self, label):
-        if self.nf == self.of:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jl(self, label):
-        if self.nf != self.of:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jle(self, label):
-        if self.zf or (self.nf != self.of):
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _ja(self, label):
-        if not self.zf and not self.cf:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jae(self, label):
-        if not self.cf:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jb(self, label):
-        if self.cf:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jbe(self, label):
-        if self.zf or self.cf:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jlt_v1(self, value, n, label):
-        # 2 cycles for arithmetic
-        self.clock.add_ticks(2)
-        if value < n:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _jge_v1(self, value, n, label):
-        # 2 cycles for arithmetic
-        self.clock.add_ticks(2)
-        if value >= n:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
-
-    def _loop_v1(self, register, label):
-        # 2 cycles for arithmetic
-        self.clock.add_ticks(2)
-        self._set_register(register, self.R[register] - 1)
+    def _jmp(self, addr):
         instr = self.instructions[self.iptr-1]
-        jump_label = instr.arglist[1][1:]
+        # address/label is last argument of instruction
+        jump_label = instr.arglist[-1][1:]
         if jump_label in self.skip_loops:
             logger.info(f'Skipping loop on {jump_label}')
             return
+        # 3 cycles for jump
+        self.clock.add_ticks(3)
+        self.iptr = addr
+
+    def _jz(self, addr):
+        if self.zf:
+            self._jmp(addr)
+
+    def _jnz(self, addr):
+        if not self.zf:
+            self._jmp(addr)
+
+    def _jo(self, addr):
+        if self.of:
+            self._jmp(addr)
+
+    def _jno(self, addr):
+        if not self.of:
+            self._jmp(addr)
+
+    def _js(self, addr):
+        if self.nf:
+            self._jmp(addr)
+
+    def _jns(self, addr):
+        if not self.nf:
+            self._jmp(addr)
+
+    def _jg(self, addr):
+        if not self.zf and (self.nf == self.of):
+            self._jmp(addr)
+
+    def _jge_v2(self, addr):
+        if self.nf == self.of:
+            self._jmp(addr)
+
+    def _jl(self, addr):
+        if self.nf != self.of:
+            self._jmp(addr)
+
+    def _jle(self, addr):
+        if self.zf or (self.nf != self.of):
+            self._jmp(addr)
+
+    def _ja(self, addr):
+        if not self.zf and not self.cf:
+            self._jmp(addr)
+
+    def _jae(self, addr):
+        if not self.cf:
+            self._jmp(addr)
+
+    def _jb(self, addr):
+        if self.cf:
+            self._jmp(addr)
+
+    def _jbe(self, addr):
+        if self.zf or self.cf:
+            self._jmp(addr)
+
+    def _jlt_v1(self, value, n, addr):
+        # 2 cycles for arithmetic
+        self.clock.add_ticks(2)
+        if value < n:
+            self._jmp(addr)
+
+    def _jge_v1(self, value, n, addr):
+        # 2 cycles for arithmetic
+        self.clock.add_ticks(2)
+        if value >= n:
+            self._jmp(addr)
+
+    def _loop_v1(self, register, addr):
+        # 2 cycles for arithmetic
+        self.clock.add_ticks(2)
+        self._set_register(register, self.R[register] - 1)
         if self.R[register] != 0:
-            # 3 cycles for jump
-            self.clock.add_ticks(3)
-            self.iptr = label
+            self._jmp(addr)
 
-    def _depr_jlt(self, value, n, label): # TODO @@@@ check timing. Register for label should not add clock tick
+    def _depr_jlt(self, value, n, addr):
         self._cmp(value, n)
         # 1 cycle to load instruction
         self.clock.add_ticks(1)
-        self._jb(label)
+        self._jb(addr)
 
-    def _depr_jge(self, value, n, label): # TODO @@@@ check timing. Register for label should not add clock tick
+    def _depr_jge(self, value, n, addr):
         self._cmp(value, n)
         # 1 cycle to load instruction
         self.clock.add_ticks(1)
-        self._jae(label)
+        self._jae(addr)
 
-    def _depr_loop(self, register, label): # TODO @@@@ check timing. Register for label should not add clock tick
+    def _depr_loop(self, register, addr):
         # 1 cycle to load register value
         self.clock.add_ticks(1)
         value = self.R[register]
@@ -336,7 +329,7 @@ class Q1Core:
         # 1 cycle to load instruction
         self.clock.add_ticks(1)
         self.updating_reg = None
-        self._jnz(label)
+        self._jnz(addr)
 
     def _move(self, source, destination):
         self._set_register(destination, source)
@@ -530,53 +523,109 @@ class Q1Core:
     def _set_cond(self, enable, mask, op, else_wait):
         self.renderer.set_cond(enable, mask, op, else_wait)
 
+    @update_rt
     def _upd_param(self, wait_after):
-        self.clock.schedule_rt(self.renderer.time)
         self.renderer.upd_param(wait_after)
 
+    @update_rt
     def _play(self, wave0, wave1, wait_after):
-        self.clock.schedule_rt(self.renderer.time)
         self.renderer.play(wave0, wave1, wait_after)
 
+    @update_rt
     def _acquire(self, bins, bin_index, wait_after):
         if not self._is_qrm:
             raise NotImplementedError('instrument type is not QRM')
-        self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire(bins, bin_index, wait_after)
 
+    @update_rt
     def _acquire_weighted(self, bins, bin_index, weight0, weight1, wait_after):
         if not self._is_qrm:
             raise NotImplementedError('instrument type is not QRM')
-        self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire_weighted(bins, bin_index, weight0, weight1, wait_after)
 
+    @update_rt
     def _acquire_ttl(self, bins, bin_index, enable, wait_after):
         if not self._is_qrm:
             raise NotImplementedError('instrument type is not QRM')
-        self.clock.schedule_rt(self.renderer.time)
         self.renderer.acquire_ttl(bins, bin_index, enable, wait_after)
 
+    @update_rt
     def _set_latch_en(self, enable, wait_after):
         if enable not in [0, 1]:
             raise ValueError('enable must be 0 or 1')
-        self.clock.schedule_rt(self.renderer.time)
         self.renderer.set_latch_en(enable, wait_after)
 
-    def _latch_rst(self, wait):
-        self.clock.schedule_rt(self.renderer.time)
-        self.renderer.latch_rst(wait)
+    @update_rt
+    def _latch_rst(self, wait_after):
+        self.renderer.latch_rst(wait_after)
 
+    @update_rt
     def _wait(self, time):
-        self.clock.schedule_rt(self.renderer.time)
         self.renderer.wait(time)
 
+    @update_rt
     def _wait_sync(self, wait_after):
-        # assume wait_sync pauses the RT exec for at least 200 ns = 50 ticks
-        self.clock.add_ticks(-50)
         self.renderer.wait_sync(wait_after)
 
     def _wait_trigger(self, wait_after):
         raise NotImplementedError()
+
+
+
+    @update_rt
+    def _fb_acq_iq_id(self, event_id, wait_after):
+        ...
+
+    @update_rt
+    def _fb_acq_iq_shift(self, rshift, wait_after):
+        ...
+
+    @update_rt
+    def _fb_acq_tb_id(self, event_id, wait_after):
+        ...
+
+    @update_rt
+    def _fb_acq_tb_cfg(self, write_combine, bit_pos, length, wait_after):
+        ...
+
+    @update_rt
+    def _fb_acq_tb_valid(self, valid, wait_after):
+        ...
+
+    @update_rt
+    def _fb_acq_tb_extra(self, valid, data, wait_after):
+        raise NotImplementedError()
+
+    @update_rt
+    def _fb_acq_tb_mock(self, enable, valid, data, wait_after):
+        ...
+
+    @update_rt
+    def _fb_com_data(self, event_id, data, wait_after):
+        ...
+
+    @update_rt
+    def _fb_com_cfg(self, write_combine, bit_pos, length, wait_after):
+        ...
+
+    @update_rt
+    def _fb_com_extra(self, valid, data, wait_after):
+        raise NotImplementedError()
+
+    def _fb_pop_data(self, event_id, destination):
+        timeout = False
+        while not timeout:
+            try:
+                value = self.fb_queue.pop(event_id)
+                self._set_register(destination, value)
+                return
+            except EmptyQueue:
+                ... # Loop till RT Underflow. @@@
+                self.scheduler.wait_till(process_id, time)
+
+
+    def _fb_pull_data(self, destination_id, destination_data):
+        ...
 
     # ---- Simulator commands ----
 

@@ -3,11 +3,10 @@ from functools import partial
 
 import matplotlib.pyplot as pt
 
+from .event_distributor import EventDistributor
 from .q1module import Q1Module
-from .q1sequencer import Q1Sequencer
 from .qblox_version import check_qblox_instrument_version
-from .triggers import TriggerDistributor
-from .trigger_sorting import get_seq_trigger_info, sort_sequencers
+from .scheduler import Scheduler
 
 from qblox_instruments import (
     InstrumentClass, InstrumentType,
@@ -26,10 +25,11 @@ class Q1Simulator(Q1Module):
         'led_brightness',
     ]
 
-    def __init__(self, name, n_sequencers=6, sim_type=None):
+    def __init__(self, name, n_sequencers=6, sim_type=None, isa_version: tuple[int, int] | None = None):
         check_qblox_instrument_version()
         super().__init__(name)
-        super().init_module(n_sequencers, sim_type)
+        scheduler = Scheduler(EventDistributor())
+        super().init_module(n_sequencers, sim_type, scheduler, isa_version=isa_version)
 
         for par_name in self._pulsar_parameters:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
@@ -37,7 +37,6 @@ class Q1Simulator(Q1Module):
         for par_name in self._log_only_params:
             self.add_parameter(par_name,
                                set_cmd=partial(self._log_set, par_name))
-        self.ignore_triggers = False
 
     def get_idn(self):
         return dict(vendor='Q1Simulator', model=self._sim_type, serial='', firmware='')
@@ -63,17 +62,6 @@ class Q1Simulator(Q1Module):
             SystemStatuses.OKAY,
             [],
             SystemStatusSlotFlags({}))
-
-    def start_sequencer(self, sequencer: int | None = None):
-        if sequencer is not None:
-            self.sequencers[sequencer].run()
-            return
-
-        # Get list of armed sequencers
-        # pass to sequence executor
-
-        sequencers = [self.sequencers[seq_number] for seq_number in self.armed_sequencers]
-        run_sequencers(sequencers, self.ignore_triggers)
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
@@ -108,22 +96,3 @@ class Q1Simulator(Q1Module):
         pt.xlabel('[ns]')
         pt.ylabel('[V]')
         pt.show()
-
-
-def run_sequencers(sequencers: list[Q1Sequencer], ignore_triggers=False):
-    if ignore_triggers:
-        for seq in sequencers:
-            seq.run()
-        return
-
-    # sort on used triggers
-
-    # TODO Refactor trigger distribution in runtime distribution.
-    seq_infos = [get_seq_trigger_info(seq) for seq in sequencers]
-    trigger_dist = TriggerDistributor()
-    seq_infos = sort_sequencers(seq_infos)
-    for seq_info in seq_infos:
-        seq = seq_info.sequencer
-        seq.set_trigger_events(trigger_dist.get_trigger_events())
-        seq.run()
-        trigger_dist.add_emitted_triggers(seq.get_acq_trigger_events())

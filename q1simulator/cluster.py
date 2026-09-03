@@ -9,20 +9,23 @@ from qblox_instruments import (
         SystemStatuses, SystemStatus, SystemStatusSlotFlags,
         )
 
+from .event_distributor import EventDistributor
 from .qblox_version import check_qblox_instrument_version
-from .q1simulator import run_sequencers
 from .q1module import Q1Module
+from .scheduler import Scheduler
 
 
 logger = logging.getLogger(__name__)
 
 
 class ClusterModule(qc.InstrumentChannel, Q1Module):
-    def __init__(self, root_instrument, name, slot, n_sequencers=6, sim_type=None,
+    def __init__(self, root_instrument, name: str, slot: int, scheduler: Scheduler, *,
+                 n_sequencers: int = 6,
+                 sim_type: str | None = None,
                  isa_version: tuple[int, int] | None = None):
         super().__init__(root_instrument, name)
         self._slot = slot
-        super().init_module(n_sequencers, sim_type, isa_version=isa_version)
+        super().init_module(n_sequencers, sim_type, scheduler, isa_version=isa_version)
 
     @property
     def slot_idx(self):
@@ -59,6 +62,8 @@ class Cluster(qc.Instrument):
 
         super().__init__(name)
 
+        self.scheduler = Scheduler(EventDistributor())
+
         # TODO return trigger count
         for i in range(1, 16):
             par_name = f'trigger{i}_monitor_count'
@@ -71,7 +76,10 @@ class Cluster(qc.Instrument):
         for slot in range(1, 21):
             name = f'module{slot}'
             if slot in modules:
-                module = ClusterModule(self, name, slot, sim_type=modules[slot], isa_version=isa_version)
+                sim_type = modules[slot]
+                module = ClusterModule(self, name, slot, self.scheduler,
+                                       sim_type=sim_type,
+                                       isa_version=isa_version)
             else:
                 module = EmptySlot(self, name)
             self.add_submodule(name, module)
@@ -150,16 +158,11 @@ class Cluster(qc.Instrument):
         else:
             modules = self.get_connected_modules().values()
 
-        # Get list of armed sequencers
-        # pass to sequence executor
-        sequencers = []
+        # Started armed sequencers
         for module in modules:
             seq_numbers = [sequencer] if sequencer is not None else module.armed_sequencers
             for seq_number in seq_numbers:
-                sequencers.append(module.sequencers[seq_number])
-
-        # TODO: run all after starting last with sync_en.
-        run_sequencers(sequencers)
+                module.sequencers[seq_number].start_sequencer()
 
     def stop_sequencer(self, slot: int | None = None, sequencer: int | None = None) -> None:
         if slot is not None:
