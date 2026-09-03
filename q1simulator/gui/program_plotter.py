@@ -115,7 +115,6 @@ def plot_simulation(
     sim.config('skip_loops', () if render_repetitions else ("_start", ))
     sim.config('skip_wait_sync', skip_wait_sync)
     sim.config('trace', trace)
-    sim.ignore_triggers = True
 
     _sim_counter += 1
 
@@ -163,7 +162,7 @@ def plot_simulation(
     sim.start_sequencer()
 
     for i, ch_name in enumerate(channels):
-        status = sim.get_sequencer_status(i)
+        status = sim.get_sequencer_status(i, timeout=1.0)
         if status.warn_flags or status.err_flags:
             print(f"State {ch_name}: {status.status} - {status.state}, {[str(flag) for flag in status.info_flags]}")
             print(f"  warnings: {[str(flag) for flag in status.warn_flags]}, "
