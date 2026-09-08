@@ -1,10 +1,12 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
-## \[1.2.1] - @@@@ NOT RELEASED
+## \[1.2.1] - 2026-09-08
 
 - Added check on number of instructions.
-- Run sequencers in concurrently use wait_sync and distribute triggers and feedback events in 'real-time'.
+- Added Q1ASM `fb_acq_...`, `fb_com_...`, `fb_pop_data`, and `fb_pull_data`.
+- Added feedback routing.
+- Run sequencers concurrently, use wait_sync, and distribute triggers and feedback events in 'real-time'.
 
 ## \[1.2.0] - 2026-08-28
 
