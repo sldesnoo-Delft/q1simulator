@@ -1,6 +1,7 @@
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from threading import Condition
 
 from .sync_barrier import SyncBarrier
@@ -9,11 +10,17 @@ from .sync_barrier import SyncBarrier
 logger = logging.getLogger(__name__)
 
 
+class EventType(Enum):
+    TRIGGER = 0
+    FEEDBACK = 1
+    FB_WRITECOMBINE = 2
+
+
 @dataclass
 class BaseEvent:
     event_time: int
-    event_type: int
-    """event type is used for sorting. @@@ might not be needed after all."""
+    event_type: EventType
+    """event type is used for sorting. """
 
 
 @dataclass
@@ -26,19 +33,23 @@ class TriggerEvent(BaseEvent):
 @dataclass
 class FeedbackEvent(BaseEvent):
     event_id: int
-    value: int  # 32 bit result
+    values: list[int]  # 32 bit results
+    event_core_time: int | None = None
 
 
 class SequencerQueue:
     def __init__(self):
         self._queue: list[BaseEvent] = []
 
-    def add_trigger(self, time: int, address: int, state: int):
-        self._append(TriggerEvent(time, 0, address, state))
+    def clear(self):
+        self._queue = []
 
-    def add_feedback_event(self, time: int, event_id, data: list[int]):
-        for value in data:
-            self._append(FeedbackEvent(time, 1, event_id, value))
+    def add_trigger(self, time: int, address: int, state: int):
+        self._append(TriggerEvent(time, EventType.TRIGGER, address, state))
+
+    def add_feedback_event(self, time: int, event_id, data: list[int], write_combine: bool):
+        event_type = EventType.FB_WRITECOMBINE if write_combine else EventType.FEEDBACK
+        self._append(FeedbackEvent(time, event_type, event_id, data))
 
     def _append(self, event: BaseEvent):
         self._queue.append(event)
@@ -47,9 +58,21 @@ class SequencerQueue:
     def get_event(self, max_time: int) -> BaseEvent | None:
         if len(self._queue) == 0:
             return None
-        event = self._queue[0]
+        q = self._queue
+        event = q[0]
+
         if event.event_time <= max_time:
-            self._queue.pop(0)
+            q.pop(0)
+            if event.event_type == EventType.FB_WRITECOMBINE:
+                logger.info(f"Combining WC: {event}")
+                while (q and q[0].event_time == event.event_time and q[0].event_type == EventType.FB_WRITECOMBINE
+                       and q[0].event_id == event.event_id):
+                    combine = q.pop(0)
+                    if len(event.values) != len(combine.values):
+                        raise Exception(f"Unequal length for feedback event with id {event.event_id}")
+                    # bitwise or of data
+                    event.values = [d1 | d2 for d1, d2 in zip(event.values, combine.values)]
+                logger.info(f"Combined {event.event_id}: {event.values}")
             return event
         else:
             return None
@@ -58,18 +81,28 @@ class SequencerQueue:
 class EventDistributor:
     def __init__(self):
         self._condition = Condition()
-        self._event_targets: dict[int, set[str]] = defaultdict(default_factory=set)
+        self._event_targets: dict[int, set[str]] = defaultdict(set)
         self._sync_barrier = SyncBarrier()
         self._sequencer_times: dict[str, SequencerTime] = {}
         # event and trigger queue per sequencer.
         self._sequencer_queue: dict[str, SequencerQueue] = {}
         self._abort_sequencers: set[str] = set()
         self._min_time: int = 0
-        self._next_emission: int = 0
         self._abort = False
 
-    def add_event_receiver(self, sequencer_name: str, event_id: int):
+    def clear_router(self, sequencer_name: str | None = None):
+        if sequencer_name is None:
+            self._event_targets.clear()
+            for queue in self._sequencer_queue.values():
+                queue.clear()
+        else:
+            for target in self._event_targets.values():
+                target.discard(sequencer_name)
+            self._sequencer_queue[sequencer_name].clear()
+
+    def set_route(self, event_id: int, sequencer_name: str):
         self._event_targets[event_id].add(sequencer_name)
+        logger.info(f"set_route {event_id} -> {sequencer_name}; ({self._event_targets[event_id]})")
 
     def set_sequencer_sync_en(self, sequencer_name: str, synced: bool):
         if synced:
@@ -83,7 +116,8 @@ class EventDistributor:
         self._abort_sequencers.discard(sequencer_name)
 
     def start_sequencer(self, sequencer_name: str):
-        self._sequencer_times[sequencer_name].update(rt_time=0, system_time=self._get_ref_time())
+        logger.info("START", self._event_targets)
+        self._sequencer_times[sequencer_name].start(self._get_ref_time())
 
     def stop_sequencer(self, sequencer_name: str):
         with self._condition:
@@ -158,6 +192,8 @@ class EventDistributor:
                 self._condition.wait()
             if wait:
                 logger.info(f"Sequencer {sequencer_name} continues")
+            if self._abort or sequencer_name not in self._abort_sequencers:
+                logger.info(f"Sequencer abort ({self._abort}, {sequencer_name in self._abort_sequencers})")
 
     def get_event(self, sequencer_name: str, rt_time: int) -> FeedbackEvent | TriggerEvent | None:
         """
@@ -173,19 +209,11 @@ class EventDistributor:
         # wait till all sequencers are at or beyond this system time.
         self._wait_till(sequencer_name, sys_time)
 
-        return self._sequencer_queue[sequencer_name].get_event(sys_time)
+        event = self._sequencer_queue[sequencer_name].get_event(sys_time)
+        if isinstance(event, FeedbackEvent):
+            event.event_core_time = event.event_time - self._sequencer_times[sequencer_name].offset
 
-
-        # TODO every render/wait step in RT
-        # return with time of event reception
-        # similar for triggers...
-
-        # fb_pull sets flag to retrieve events.
-        # active condition sets flag to retrieve events.
-
-        # if fb_pull flag set: call get_event and update Q1Core time with event time.
-        # If none: Underflow
-
+        return event
 
     def emit_trigger(self, sequencer_name: str, rt_time: int, address: int, state: int):
         self.set_sequencer_time(sequencer_name, rt_time)
@@ -194,15 +222,14 @@ class EventDistributor:
         for sequencer_queue in self._sequencer_queue.values():
             sequencer_queue.add_trigger(t_delivery, address, state)
 
-        # TDOO sequencer: process new triggers update counts and trigger thresholds to mask at every conditional instruction
-
-
-    def fb_send(self, sequencer_name: str, rt_time: int, event_id: int, data: list[int], data_type: str):
+    def fb_send(self, sequencer_name: str, rt_time: int, event_id: int, data: list[int], data_type: str,
+                write_combine: bool):
         """
         Note: Distribution latencies are not exact.
 
         Deliveries are multi-cast or self-cast. Intra-cast is currently handled as multi-cast.
         """
+        logger.info(f"fb send: {sequencer_name}, {rt_time}, {event_id}")
 
         # distribution latency for self-cast for 1 32 bit value.
         data_type_latency = {
@@ -217,23 +244,24 @@ class EventDistributor:
 
         self.set_sequencer_time(sequencer_name, rt_time)
         sys_time = self._sequencer_times[sequencer_name].system_time
+        self._wait_till(sequencer_name, sys_time)
 
         type_latency = data_type_latency[data_type]
 
         length = len(data)
-        # TODO special case: self cast.
-        if event_id <= 16:
+        if event_id <= 15:
+            # special case: self cast.
             latency = 4*(length-1) + type_latency
             t_delivery = sys_time + latency
             sequencer_queue = self._sequencer_queue[sequencer_name]
             sequencer_queue.add_feedback_event(t_delivery, event_id, data)
         else:
-            if self._next_emission > sys_time:
-                t_send = self._next_emission
-            else:
-                t_send = sys_time
-            # just add 200 ns busy occupation time.
-            self._next_emission = t_send + 200
+            # TODO: distinct intra-cast / multi-cast
+            # Bus occupancy is currently ignored!
+            t_send = sys_time
+
+            # Note: Write combines are merged upon reception
+
             # multi-cast latency is ~320 + type latency.
             latency = 20*(length-1) + type_latency + 320
             t_delivery = t_send + latency
@@ -241,27 +269,42 @@ class EventDistributor:
             targets = self._event_targets[event_id]
             for target_name in targets:
                 sequencer_queue = self._sequencer_queue[target_name]
-                sequencer_queue.add_feedback_event(t_delivery, event_id, data)
+                sequencer_queue.add_feedback_event(t_delivery, event_id, data, write_combine)
 
     def _get_ref_time(self):
         return max(seq.system_time for seq in self._sequencer_times.values())
 
+    def _print(self, sequencer_name):
+        print("Sequencer", sequencer_name)
+        print(self._sequencer_times[sequencer_name])
+        print(self._sequencer_queue[sequencer_name]._queue)
+        print("Abort", self._abort, sequencer_name in self._abort_sequencers)
+
 
 class SequencerTime:
     def __init__(self):
-        self._sync_offset: int = 0
+        self._offset: int = 0
         self._rt_time: int = 0
 
-    def update(self, /, rt_time: int | None = None, system_time: int | None = None):
+    def start(self, offset):
+        self._offset = offset
+        self._rt_time: int = 0
+
+    def update(self, /, rt_time: int | None = None):
         if rt_time is not None:
             self._rt_time = rt_time
-        if system_time is not None:
-            self._sync_offset = system_time - self._rt_time
 
     @property
     def system_time(self):
-        return self._sync_offset + self._rt_time
+        return self.offset + self._rt_time
 
     @property
     def rt_time(self):
         return self._rt_time
+
+    @property
+    def offset(self):
+        return self._offset
+
+    def __str__(self):
+        return f"sys: {self.system_time}, rt: {self.rt_time}"

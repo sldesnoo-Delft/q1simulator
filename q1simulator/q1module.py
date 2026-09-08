@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from functools import partial
 
 import numpy as np
@@ -273,6 +274,25 @@ class Q1Module(qc.instrument.InstrumentBase):
         for sequencer in self.sequencers:
             for i in range(n_out_ch):
                 sequencer.parameters[f"connect_out{i}"].set("off")
+
+    def set_local_route(
+            self,
+            id_: int | list[int],
+            sequencers: Iterable[Q1Sequencer] | None = None,
+            ) -> None:
+        ids = id_ if isinstance(id_, Iterable) else (id_,)
+        sequencers = sequencers | self.sequencers
+        for seq in sequencers:
+            for event_id in ids:
+                self._scheduler.event_distributor.set_route(event_id, seq.name)
+
+    def clear_router(self) -> None:
+        for seq in self.sequencers:
+            self._scheduler.event_distributor.clear_router(seq.name)
+
+    def get_router_config(self) -> dict:
+        # TODO Implement.
+        raise NotImplementedError("Spec not clear")
 
     # ---- Simulator specific methods ----
 

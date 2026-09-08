@@ -1,4 +1,5 @@
 import logging
+import math
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Sequence, Iterable
@@ -47,6 +48,35 @@ class AcqIntegration:
     stop: int
     weight0: int | None = None
     weight1: int | None = None
+
+
+@dataclass
+class FeedbackQueueEntry:
+    core_time: int
+    event_id: int
+    value: int
+
+
+@dataclass
+class FeedbackIQConfig:
+    event_id: int = 0
+    shift: int = 0
+
+
+@dataclass
+class FeedbackTbConfig:
+    event_id: int = 0
+    write_combine: int = 0
+    bit_pos: int = 0
+    length: int = 0
+    valid: int = 1
+
+
+@dataclass
+class FeedbackComConfig:
+    write_combine: int = 0
+    bit_pos: int = 0
+    length: int = 0
 
 
 def _phase2float(phase_uint32):
@@ -143,6 +173,9 @@ class Renderer:
         self.acq_times = {i: [] for i in self.acquisitions}
         self.acq_buffer = AcqBuffer()
         self.acq_ttl_start = None
+        self.fb_iq_conf = FeedbackIQConfig()
+        self.fb_tb_conf = FeedbackTbConfig()
+        self.fb_com_conf = FeedbackComConfig()
         self.mock_data = {}
         self.errors = set()
         self.latch_enabled = False
@@ -151,6 +184,7 @@ class Renderer:
         self.condition_enabled = False
         self.skip_rt = False
         self.else_wait = 0
+        self.feedback_queue: list[FeedbackQueueEntry] = []
         self._trace(f"---Reset {self.name}---")
 
     @property
@@ -374,34 +408,64 @@ class Renderer:
         self._render(wait)
 
     def fb_acq_iq_id(self, event_id, wait_after):
-        ...
+        self.fb_iq_conf.event_id = event_id
+        self._render(wait_after)
 
     def fb_acq_iq_shift(self, rshift, wait_after):
-        ...
+        self.fb_iq_conf.shift = rshift
+        self._render(wait_after)
 
     def fb_acq_tb_id(self, event_id, wait_after):
-        ...
+        self.fb_tb_conf.event_id = event_id
+        self._render(wait_after)
 
     def fb_acq_tb_cfg(self, write_combine, bit_pos, length, wait_after):
-        ...
+        self.fb_tb_conf.write_combine = write_combine
+        self.fb_tb_conf.bit_pos = bit_pos
+        self.fb_tb_conf.length = length
+        self._render(wait_after)
 
     def fb_acq_tb_valid(self, valid, wait_after):
-        ...
+        self.fb_tb_conf.valid = valid
+        self._render(wait_after)
 
     # def fb_acq_tb_extra(self, valid, data, wait_after):
     #     ... # Not implemented
 
-    def fb_acq_tb_mock(self, enable, valid, data, wait_after):
-        ...
+    # def fb_acq_tb_mock(self, enable, valid, data, wait_after):
+    #     ... # Not implemented
+    #     self._render(wait_after)
 
     def fb_com_data(self, event_id, data, wait_after):
-        ...
+        conf = self.fb_com_conf
+        n_ints = max(1, math.ceil(conf.length/4))
+        event_data = [0]*n_ints
+        i, shift = divmod(conf.bit_pos, 32)
+        event_data[i] = (data << shift) & 0xFFFF_FFFF
+        if shift > 0 and i < n_ints-1:
+            event_data[i+1] = (data & 0xFFFF_FFFF) >> (32 - shift)
+        self._event_distributor.fb_send(self.name, self.time, event_id, event_data, "q1", conf.write_combine)
+        self._render(wait_after)
 
     def fb_com_cfg(self, write_combine, bit_pos, length, wait_after):
-        ...
+        self.fb_com_conf.write_combine = write_combine
+        self.fb_com_conf.bit_pos = bit_pos
+        self.fb_com_conf.length = length
+        self._render(wait_after)
 
     # def fb_com_extra(self, valid, data, wait_after):
     #     ... # Not implemented
+
+    def fb_event_pop(self) -> FeedbackQueueEntry | None:
+        self._trace("fb_event_pop")
+        self._process_events()
+        try:
+            self._trace(f"fb_event_pop {self.feedback_queue[0]}")
+            return self.feedback_queue.pop(0)
+        except IndexError:
+            # self._event_distributor._print(self.name)
+            self._trace("fb_event_pop->None")
+            return None
 
     def sim_trigger(self, addr, value):
         self._process_trigger(TriggerEvent(self.time, 0, int(addr), int(value)))
@@ -558,8 +622,8 @@ class Renderer:
                 raise Exception(f"Unknown event type {event}")
 
     def _process_feedback_event(self, fb_event: FeedbackEvent):
-        ...
-        TODO
+        for value in fb_event.values:
+            self.feedback_queue.append(FeedbackQueueEntry(fb_event.event_core_time, fb_event.event_id, value))
 
     def _process_trigger(self, trigger: TriggerEvent):
         if not self.latch_enabled:
@@ -615,7 +679,6 @@ class Renderer:
         logger.debug(f'cond:        {match}')
         self._trace(f'Cond {match} {state}')
         self.skip_rt = not match
-
 
     def _get_acq_data(self, acq_index, default):
         mock_data_iter = self.mock_data.get(acq_index, None)
@@ -688,6 +751,24 @@ class Renderer:
 
             self._event_distributor.emit_trigger(self.name, t_end, acq_conf.trigger_addr, trigger_state)
             self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
+
+        fb_iq_conf = self.fb_iq_conf
+        event_time = self.time + self.acq_conf.length
+        if fb_iq_conf.event_id > 0:
+            shift = fb_iq_conf.shift
+            event_data = [(value[0] >> shift) & 0xFFFF_FFFF, (value[1] >> shift) & 0xFFFF_FFFF]
+            self._event_distributor.fb_send(self.name, event_time, fb_iq_conf.event_id, event_data, "iq", False)
+        fb_tb_conf = self.fb_tb_conf
+        if fb_tb_conf.event_id > 0:
+            data = state + (fb_tb_conf.valid << 1)
+            n_ints = math.ceil(len(fb_tb_conf.length)/4)
+            event_data = [0]*n_ints
+            i, shift = divmod(fb_tb_conf.bit_pos, 32)
+            event_data[i] = (data << shift) & 0xFFFF_FFFF
+            if shift > 0:
+                event_data[i+1] = (data & 0xFFFF_FFFF) >> (32 - shift)
+            self._event_distributor.fb_send(self.name, self.time, fb_tb_conf.event_id, event_data, "tb",
+                                            fb_tb_conf.write_combine)
 
     def _add_acquisition_ttl(self, acq_index, bin_index, start, stop):
         if acq_index not in self.acquisitions:

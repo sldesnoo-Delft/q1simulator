@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from functools import partial
 
 import matplotlib.pyplot as pt
@@ -12,6 +13,7 @@ from qblox_instruments import (
 from .event_distributor import EventDistributor
 from .qblox_version import check_qblox_instrument_version
 from .q1module import Q1Module
+from .q1sequencer import Q1Sequencer
 from .scheduler import Scheduler
 
 
@@ -62,7 +64,8 @@ class Cluster(qc.Instrument):
 
         super().__init__(name)
 
-        self.scheduler = Scheduler(EventDistributor())
+        self._event_distributor = EventDistributor()
+        self._scheduler = Scheduler(self._event_distributor)
 
         # TODO return trigger count
         for i in range(1, 16):
@@ -77,7 +80,7 @@ class Cluster(qc.Instrument):
             name = f'module{slot}'
             if slot in modules:
                 sim_type = modules[slot]
-                module = ClusterModule(self, name, slot, self.scheduler,
+                module = ClusterModule(self, name, slot, self._scheduler,
                                        sim_type=sim_type,
                                        isa_version=isa_version)
             else:
@@ -195,6 +198,31 @@ class Cluster(qc.Instrument):
 
     def disconnect_outputs(self, slot: int) -> None:
         self._modules[slot].disconnect_outputs()
+
+    def clear_router(self):
+        self._event_distributor.clear_router()
+
+    def set_cmm_route(self,
+                      id_: int | list[int],
+                      targets: Iterable[Q1Module | Q1Sequencer]
+                      ) -> None:
+        ids = id_ if isinstance(id_, Iterable) else (id_,)
+        sequencer_names = []
+        for target in targets:
+            if hasattr(target, "sequencers"):
+                # it's a module
+                sequencer_names += [seq.name for seq in target.sequencers]
+            else:
+                sequencer_names.append(target.name)
+        for event_id in ids:
+            for name in sequencer_names:
+                self._event_distributor.set_route(event_id, name)
+
+    def set_broad_cast(self,
+                       id_: int | list[int],
+                       ) -> None:
+        modules = [module for module in self.modules.values() if module.present()]
+        self.set_cmm_route(id_, modules)
 
     def _log_set(self, name, value):
         logger.info(f"{self.name}: {name}={value}")

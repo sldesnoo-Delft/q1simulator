@@ -1,10 +1,12 @@
 import logging
+from collections.abc import Iterable
 from functools import partial
 
 import matplotlib.pyplot as pt
 
 from .event_distributor import EventDistributor
 from .q1module import Q1Module
+from .q1sequencer import Q1Sequencer
 from .qblox_version import check_qblox_instrument_version
 from .scheduler import Scheduler
 
@@ -62,6 +64,31 @@ class Q1Simulator(Q1Module):
             SystemStatuses.OKAY,
             [],
             SystemStatusSlotFlags({}))
+
+    def clear_router(self):
+        self._event_distributor.clear_router()
+
+    def set_cmm_route(self,
+                      id_: int | list[int],
+                      targets: Iterable[Q1Module | Q1Sequencer]
+                      ) -> None:
+        ids = id_ if isinstance(id_, Iterable) else (id_,)
+        sequencer_names = []
+        for target in targets:
+            if hasattr(target, "sequencers"):
+                # it's a module
+                sequencer_names += [seq.name for seq in target.sequencers]
+            else:
+                sequencer_names.append(target.name)
+        for event_id in ids:
+            for name in sequencer_names:
+                self._event_distributor.set_route(event_id, name)
+
+    def set_broad_cast(self,
+                       id_: int | list[int],
+                       ) -> None:
+        # There is only 1 module in Q1Simulator.
+        self.set_cmm_route(id_, self)
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')

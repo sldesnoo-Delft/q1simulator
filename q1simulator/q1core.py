@@ -6,6 +6,7 @@ import numpy as np
 
 from .q1parser import Q1Parser
 from .event_distributor import EventDistributor
+from .rt_renderer import Renderer, FeedbackQueueEntry
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class Q1Core:
     max_instructions_qcm = 16384
     max_instructions_qrm = 12288
 
-    def __init__(self, name, renderer, is_qrm, event_distributor: EventDistributor,
+    def __init__(self, name: str, renderer: Renderer, is_qrm: bool, event_distributor: EventDistributor,
                  isa_version: int = 1):
         self.name = name
         self.renderer = renderer
@@ -217,6 +218,8 @@ class Q1Core:
         raise Illegal('illegal instruction')
 
     def _stop(self, exit_code: int = 0):
+        # update clock and check RT time for underflows
+        self.clock.schedule_rt(self.renderer.time)
         self.event_distributor.stop_sequencer(self.name)
         raise Halt('stop instruction', exit_code=exit_code)
 
@@ -570,27 +573,25 @@ class Q1Core:
     def _wait_trigger(self, wait_after):
         raise NotImplementedError()
 
-
-
     @update_rt
     def _fb_acq_iq_id(self, event_id, wait_after):
-        ...
+        self.renderer.fb_acq_iq_id(event_id, wait_after)
 
     @update_rt
     def _fb_acq_iq_shift(self, rshift, wait_after):
-        ...
+        self.renderer.fb_acq_iq_shift(rshift, wait_after)
 
     @update_rt
     def _fb_acq_tb_id(self, event_id, wait_after):
-        ...
+        self.renderer.fb_acq_tb_id(event_id, wait_after)
 
     @update_rt
     def _fb_acq_tb_cfg(self, write_combine, bit_pos, length, wait_after):
-        ...
+        self.renderer.fb_acq_tb_cfg(write_combine, bit_pos, length, wait_after)
 
     @update_rt
     def _fb_acq_tb_valid(self, valid, wait_after):
-        ...
+        self.renderer.fb_acq_tb_valid(valid, wait_after)
 
     @update_rt
     def _fb_acq_tb_extra(self, valid, data, wait_after):
@@ -598,34 +599,43 @@ class Q1Core:
 
     @update_rt
     def _fb_acq_tb_mock(self, enable, valid, data, wait_after):
-        ...
+        self.renderer.fb_acq_tb_mock(enable, valid, data, wait_after)
 
     @update_rt
     def _fb_com_data(self, event_id, data, wait_after):
-        ...
+        self.renderer.fb_com_data(event_id, data, wait_after)
 
     @update_rt
     def _fb_com_cfg(self, write_combine, bit_pos, length, wait_after):
-        ...
+        self.renderer.fb_com_cfg(write_combine, bit_pos, length, wait_after)
 
     @update_rt
     def _fb_com_extra(self, valid, data, wait_after):
         raise NotImplementedError()
 
-    def _fb_pop_data(self, event_id, destination):
-        timeout = False
-        while not timeout:
-            try:
-                value = self.fb_queue.pop(event_id)
-                self._set_register(destination, value)
-                return
-            except EmptyQueue:
-                ... # Loop till RT Underflow. @@@
-                self.scheduler.wait_till(process_id, time)
+    def _fb_pop_event(self) -> FeedbackQueueEntry:
+        entry = self.renderer.fb_event_pop()
+        if entry is None:
+            raise Abort('Timeout on feedback pop',
+                        'SEQUENCE PROCESSOR RT EXEC COMMAND UNDERFLOW')
+        clock_time = (entry.core_time // 4 * 4)
+        self.clock.wait_till(clock_time)
+        logger.info(f"fb event {entry.event_id}:{entry.value} (t={clock_time})")
+        return entry
 
+    def _fb_pop_data(self, event_id, destination):
+        while True:
+            event = self._fb_pop_event()
+            if event.event_id == event_id:
+                logger.info(f"fb pop data {event.event_id}: R{destination}->{event.value}")
+                self._set_register(destination, event.value)
+                return
 
     def _fb_pull_data(self, destination_id, destination_data):
-        ...
+        event = self._fb_pop_event()
+        logger.info(f"fb pull data R{destination_id} -> {event.event_id}; R{destination_data}->{event.value}")
+        self._set_register(destination_id, event.event_id)
+        self._set_register(destination_data, event.value)
 
     # ---- Simulator commands ----
 
@@ -658,6 +668,10 @@ class CoreClock:
 
     def add_ticks(self, value):
         self.core_time += value * 4
+
+    def wait_till(self, time):
+        if time > self.core_time:
+            self.core_time = time
 
     def schedule_rt(self, time):
         # print(f'Sched {time:6} at {self.core_time:6}')
