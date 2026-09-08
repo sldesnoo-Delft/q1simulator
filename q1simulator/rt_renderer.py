@@ -159,6 +159,7 @@ class Renderer:
         self.settings = deepcopy(self.next_settings)
         self.time = 0
         self.no_render_till_sync = self._skip_wait_sync
+        self.t_sync = 0
         # Qblox sequencer has 3 different phase registers
         self.nco_phase_offset = 0.0
         self.relative_phase = 0.0
@@ -195,6 +196,7 @@ class Renderer:
     def skip_wait_sync(self, value):
         self._skip_wait_sync = value
         self.no_render_till_sync = self._skip_wait_sync
+        self.t_sync = 0
 
     def gain_awg_path(self, gain, path):
         self.next_settings.awg_gain[path] = gain
@@ -370,6 +372,7 @@ class Renderer:
         sync_time = new_time - self.time
         self._render(sync_time + wait_after)
         self.no_render_till_sync = False
+        self.t_sync = self.time
 
     def set_cond(self, enable, mask, op, else_wait):
         # Update triggers
@@ -532,18 +535,22 @@ class Renderer:
         pending.relative_phase = None
         pending.frequency = None
 
-    def _render_marker(self, old_marker, new_marker): # @@@ TODO skip wait sync
+    def _render_marker(self, old_marker, new_marker):
+        if self.no_render_till_sync:
+            return
         for i in range(4):
             m = 1 << i
             m_old = (old_marker & m) != 0
             m_new = (new_marker & m) != 0
             if m_new != m_old:
+                t = self.time - self.t_sync
+                t_max = self.max_render_time - self.t_sync
                 marker_out = self.marker_out[i]
-                if self.time < self.max_render_time:
-                    marker_out += [[self.time, m_old], [self.time, m_new]]
-                elif marker_out[-1][0] < self.max_render_time:
+                if self.time < t_max:
+                    marker_out += [[t, m_old], [t, m_new]]
+                elif marker_out[-1][0] < t_max:
                     # add final marker step
-                    marker_out += [[self.max_render_time, m_old], [self.max_render_time, 0]]
+                    marker_out += [[t_max, m_old], [t_max, 0]]
 
     def _render(self, time):
         if time < 4:
@@ -719,9 +726,8 @@ class Renderer:
         if acq_index not in self.acquisitions:
             self._error('ACQ INDEX INVALID')
             return
-
-        self.acq_times[acq_index].append((t, bin_index))
-        self.acq_integrations.append(AcqIntegration(t, t_end, weight0, weight1))
+        self.acq_times[acq_index].append((t - self.t_sync, bin_index))
+        self.acq_integrations.append(AcqIntegration(t-self.t_sync, t_end-self.t_sync, weight0, weight1))
         if bin_index >= self.acquisitions[acq_index]:
             self._error('ACQ BIN INDEX INVALID')
             return
@@ -774,8 +780,8 @@ class Renderer:
         if acq_index not in self.acquisitions:
             self._error('ACQ INDEX INVALID')
             return
-        self.acq_times[acq_index].append((start, bin_index))
-        self.acq_integrations.append(AcqIntegration(start, stop))
+        self.acq_times[acq_index].append((start - self.t_sync, bin_index))
+        self.acq_integrations.append(AcqIntegration(start-self.t_sync, stop-self.t_sync))
         if bin_index >= self.acquisitions[acq_index]:
             self._error('ACQ BIN INDEX INVALID')
             return
@@ -821,8 +827,8 @@ class Renderer:
             _filter = self._get_analogue_filter(output_frequency)
 
         scaling = v_max/2**15
-        t_end = self.time
-        if self.time > self.max_render_time:
+        t_end = self.time - self.t_sync
+        if t_end > self.max_render_time:
             max_ms = self.max_render_time / 1e6
             t_end = self.max_render_time
             print(f'{self.name}: Rendering truncated at {max_ms:3.1f} ms. Total time: {self.time/1e6:4.1f} ms')
@@ -885,6 +891,7 @@ class Renderer:
         windows = []
         for acq_int in self.acq_integrations:
             # Add 0,0 before and after window
+            print(acq_int)
             t = np.arange(acq_int.start-1, acq_int.stop+1)
             i = np.zeros(len(t))
             q = np.zeros(len(t))
