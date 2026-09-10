@@ -776,7 +776,6 @@ class Renderer:
         if fb_iq_conf.event_id > 0:
             shift = fb_iq_conf.shift
             iq_values = [(int(v * 2**12) >> shift) & 0xFFFF_FFFF for v in value]
-            print(iq_values)
             event_data = iq_values
             self._event_distributor.fb_send(self.name, event_time, fb_iq_conf.event_id, event_data, "iq", False)
 
@@ -895,7 +894,6 @@ class Renderer:
         windows = []
         for acq_int in self.acq_integrations:
             # Add 0,0 before and after window
-            print(acq_int)
             t = np.arange(acq_int.start-1, acq_int.stop+1)
             i = np.zeros(len(t))
             q = np.zeros(len(t))
