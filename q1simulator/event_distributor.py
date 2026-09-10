@@ -72,9 +72,12 @@ class SequencerQueue:
                         raise Exception(f"Unequal length for feedback event with id {event.event_id}")
                     # bitwise or of data
                     event.values = [d1 | d2 for d1, d2 in zip(event.values, combine.values)]
-                logger.info(f"Combined {event.event_id}: {event.values}")
+                logger.info(f"Combined {event.event_id} ({event.event_time}): {event.values}")
+            else:
+                logger.info(f"Event {event.event_id} ({event.event_time}): {event.values}")
             return event
         else:
+            logger.debug(f"No event {max_time}")
             return None
 
 
@@ -116,7 +119,6 @@ class EventDistributor:
         self._abort_sequencers.discard(sequencer_name)
 
     def start_sequencer(self, sequencer_name: str):
-        logger.info("START", self._event_targets)
         self._sequencer_times[sequencer_name].start(self._get_ref_time())
 
     def stop_sequencer(self, sequencer_name: str):
@@ -187,7 +189,7 @@ class EventDistributor:
         with self._condition:
             wait = self._min_time < system_time
             if wait:
-                logger.info(f"Sequencer {sequencer_name} waits...")
+                logger.info(f"Sequencer {sequencer_name} waits at sys:{system_time} ...")
             while self._min_time < system_time and not self._abort and sequencer_name not in self._abort_sequencers:
                 self._condition.wait()
             if wait:
@@ -229,7 +231,6 @@ class EventDistributor:
 
         Deliveries are multi-cast or self-cast. Intra-cast is currently handled as multi-cast.
         """
-        logger.info(f"fb send: {sequencer_name}, {rt_time}, {event_id}")
 
         # distribution latency for self-cast for 1 32 bit value.
         data_type_latency = {
@@ -244,6 +245,7 @@ class EventDistributor:
 
         self.set_sequencer_time(sequencer_name, rt_time)
         sys_time = self._sequencer_times[sequencer_name].system_time
+        logger.info(f"fb send: {sequencer_name}, {rt_time} ({sys_time}), {event_id}, {data}")
         self._wait_till(sequencer_name, sys_time)
 
         type_latency = data_type_latency[data_type]
@@ -268,6 +270,7 @@ class EventDistributor:
 
             targets = self._event_targets[event_id]
             for target_name in targets:
+                logger.debug(f"event {event_id} -> {target_name} at {t_delivery}(sys) latency:{latency}")
                 sequencer_queue = self._sequencer_queue[target_name]
                 sequencer_queue.add_feedback_event(t_delivery, event_id, data, write_combine)
 

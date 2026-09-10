@@ -172,8 +172,14 @@ class Q1Core:
     def _print_error_msg(self, msg, instr, cntr):
         last_line = self.lines[instr.text_line_nr]
         rt_time_us = self.renderer.time / 1000
-        print(f'*** {self.name}: {msg} ({cntr} cycles, {rt_time_us:7.3f} us)')
-        print(f'*** Last instruction: {last_line}')
+        msgs = [
+            f'*** {self.name}: {msg} ({cntr} cycles, {rt_time_us:7.3f} us)',
+            f'*** Last instruction line {instr.text_line_nr}: {last_line}',
+            ]
+        for msg in msgs:
+            logger.error(msg)
+        for msg in msgs:
+            print(msg)
 
     def _error(self, msg):
         self.errors.add(msg)

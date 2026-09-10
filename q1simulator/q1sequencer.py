@@ -514,6 +514,7 @@ class Q1Sequencer(InstrumentChannel, Task):
             self.q1core.run()
             self.run_state = 'STOPPED'
         except (Exception, KeyboardInterrupt):
+            self.run_state = 'STOPPED'
             logger.error(f"Exception in {self.name}", exc_info=True)
 
     def abort(self):

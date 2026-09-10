@@ -68,7 +68,7 @@ class FeedbackTbConfig:
     event_id: int = 0
     write_combine: int = 0
     bit_pos: int = 0
-    length: int = 0
+    length: int = 1
     valid: int = 1
 
 
@@ -758,23 +758,27 @@ class Renderer:
             self._event_distributor.emit_trigger(self.name, t_end, acq_conf.trigger_addr, trigger_state)
             self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
 
-        fb_iq_conf = self.fb_iq_conf
+        # Always sent afer fixed integration time!
         event_time = self.time + self.acq_conf.length
-        if fb_iq_conf.event_id > 0:
-            shift = fb_iq_conf.shift
-            event_data = [(value[0] >> shift) & 0xFFFF_FFFF, (value[1] >> shift) & 0xFFFF_FFFF]
-            self._event_distributor.fb_send(self.name, event_time, fb_iq_conf.event_id, event_data, "iq", False)
+        # TB is sent before IQ.
         fb_tb_conf = self.fb_tb_conf
         if fb_tb_conf.event_id > 0:
             data = state + (fb_tb_conf.valid << 1)
-            n_ints = math.ceil(len(fb_tb_conf.length)/4)
+            n_ints = max(1, math.ceil(fb_tb_conf.length/4))
             event_data = [0]*n_ints
             i, shift = divmod(fb_tb_conf.bit_pos, 32)
             event_data[i] = (data << shift) & 0xFFFF_FFFF
-            if shift > 0:
+            if shift > 0 and i + 1 < n_ints:
                 event_data[i+1] = (data & 0xFFFF_FFFF) >> (32 - shift)
-            self._event_distributor.fb_send(self.name, self.time, fb_tb_conf.event_id, event_data, "tb",
+            self._event_distributor.fb_send(self.name, event_time, fb_tb_conf.event_id, event_data, "tb",
                                             fb_tb_conf.write_combine)
+        fb_iq_conf = self.fb_iq_conf
+        if fb_iq_conf.event_id > 0:
+            shift = fb_iq_conf.shift
+            iq_values = [(int(v * 2**12) >> shift) & 0xFFFF_FFFF for v in value]
+            print(iq_values)
+            event_data = iq_values
+            self._event_distributor.fb_send(self.name, event_time, fb_iq_conf.event_id, event_data, "iq", False)
 
     def _add_acquisition_ttl(self, acq_index, bin_index, start, stop):
         if acq_index not in self.acquisitions:
