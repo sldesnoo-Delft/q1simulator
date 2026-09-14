@@ -386,7 +386,7 @@ class Q1Module(qc.instrument.InstrumentBase):
             # assume only sequencers in sync mode have executed.
             if not seq.sync_en():
                 continue
-            # sequencer may generate output on muliple outputs (I, Q, marker)
+            # sequencer may generate output on multiple outputs (I, Q, marker)
             seq_output = seq.get_output(t_min=t_min, t_max=t_max,
                                         analogue_filter=analogue_filter,
                                         output_frequency=output_frequency)

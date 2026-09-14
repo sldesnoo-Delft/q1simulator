@@ -614,7 +614,7 @@ class Q1Sequencer(InstrumentChannel):
                 otherwise list of mock data for every run of the sequence.
             name: name of the acquisition
             repeat:
-                if True repeatly cycles through the list of mock data,
+                if True repeatedly cycles through the list of mock data,
                 otherwise an exception is raised when the list of mock data is exhausted.
 
         Example:
