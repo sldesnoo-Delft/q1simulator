@@ -48,7 +48,9 @@ class Cluster(qc.Instrument):
         'trigger_monitor_latest',
         ]
 
-    def __init__(self, name, modules={}, isa_version: tuple[int, int] | None = None):
+    def __init__(self, name, modules: dict | None = None, isa_version: tuple[int, int] | None = None):
+        if modules is None:
+           modules = {}
         check_qblox_instrument_version()
         if qc.Instrument.exist(name):
             logger.info(f"Closing old simulator with same name ({name})")
