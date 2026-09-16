@@ -32,13 +32,18 @@ The parameters must explicitly be set.
 # Installation
 
 Q1Simulator visualization and GUI require Qt bindings for python.
-Make sure one of the following packages is installed: `PySide6`, `PySide2`, `PyQt6`
+Make sure one of the following packages is installed: `PySide6`, `PySide2`, `PyQt6`,
 `PyQt`.
 
-Install Q1Simulator from git.
+Install Q1Simulator from git or from this repository code.
 
 ```shell
 pip install "q1simulator@git+https://github.com/sldesnoo-Delft/q1simulator@v1.2.0"
+```
+
+```shell
+# clone or download source code from this repository
+pip install .
 ```
 
 # Example
