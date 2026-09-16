@@ -207,10 +207,10 @@ class Q1Sequencer(InstrumentChannel, Task):
         logger.debug(f'{self.name}: _connect_out{out}={value}')
         self.output_selected_path[out] = value
         paths_used = [False, False]
-        for value in self.output_selected_path:
-            if "I" in value:
+        for path in self.output_selected_path:
+            if "I" in path:
                 paths_used[0] = True
-            if "Q" in value:
+            if "Q" in path:
                 paths_used[1] = True
         self._paths_used = paths_used
         self.rt_renderer.enable_paths(self._paths_used)
@@ -652,7 +652,7 @@ class Q1Sequencer(InstrumentChannel, Task):
                 otherwise list of mock data for every run of the sequence.
             name: name of the acquisition
             repeat:
-                if True repeatly cycles through the list of mock data,
+                if True repeatedly cycles through the list of mock data,
                 otherwise an exception is raised when the list of mock data is exhausted.
 
         Example:

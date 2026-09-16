@@ -356,7 +356,7 @@ class Q1Core:
 
         res = lhs + rhs
 
-        # signed / usigned 32 bit calculations
+        # signed / unsigned 32 bit calculations
         ures = np.uint64(lhs) + rhs
         sres = np.int64(np.int32(lhs)) + np.int32(rhs)
         self.cf = ures >= (1 << 32)
@@ -370,7 +370,7 @@ class Q1Core:
         self.clock.add_ticks(2)
         res = lhs - rhs
 
-        # signed / usigned 32 bit calculations
+        # signed / unsigned 32 bit calculations
         ures = np.uint64(lhs) - rhs
         sres = np.int64(np.int32(lhs)) - np.int32(rhs)
         self.cf = ures >= (1 << 32)
