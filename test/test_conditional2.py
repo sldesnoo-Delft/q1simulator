@@ -4,6 +4,11 @@ import qcodes as qc
 from q1simulator import Cluster as SimCluster
 from qblox_instruments import Cluster
 
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(filename='test_log.txt', encoding='utf-8', level=logging.INFO)
+
+
 def generate_waveforms():
     ''' Generates ramps '''
     waveforms = {}
@@ -26,9 +31,9 @@ class TestCluster:
         if sim:
             cluster = SimCluster('test', {1:'QCM', 2:'QRM'})
             qcm = cluster.module1
-            qcm.config('trace', True)
+            # qcm.config('trace', True)
             qrm = cluster.module2
-            qrm.config('trace', True)
+            # qrm.config('trace', True)
         else:
             cluster = Cluster('Qblox_Cluster', '192.168.0.3')
             qcm = cluster.module2
@@ -88,6 +93,8 @@ class TestCluster:
 
     def run(self):
         self.cluster.start_sequencer()
+        for slot_idx, seq_num in self.armed:
+            self.cluster.get_sequencer_status(slot_idx, seq_num, 1)
         if self.sim:
             self.qrm.plot()
             self.qcm.plot()
@@ -99,7 +106,7 @@ acquisitions = {
         "acq0": {"num_bins": 1, "index": 0},
         }
 
-n_rep = 20_000_000
+n_rep = 200
 sim.reset()
 
 #%% IF-ELSE play

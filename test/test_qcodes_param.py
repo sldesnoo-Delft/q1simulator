@@ -33,6 +33,6 @@ seq.sequence(sequence)
 
 sim.arm_sequencer(0)
 sim.start_sequencer(0)
-sim.get_sequencer_status(0)
+sim.get_sequencer_status(0, timeout=1.0)
 
 sim.plot()
