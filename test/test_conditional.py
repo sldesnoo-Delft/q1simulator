@@ -8,6 +8,10 @@ import matplotlib.pyplot as plt
 from q1simulator import Cluster
 import qcodes as qc
 
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(filename='test.log', encoding='utf-8', level=logging.DEBUG)
+
 
 def init():
     qc.Instrument.close_all()
@@ -30,7 +34,7 @@ def run(cluster, program, waveforms={}, weights={}, acquisitions={}):
     seq.thresholded_acq_trigger_en(True)
     seq.thresholded_acq_trigger_address(1)
     seq.trigger1_count_threshold(1)
-    seq.upload({
+    seq.sequence({
         'program': program,
         'waveforms': waveforms,
         'weights': weights,
@@ -42,8 +46,8 @@ def run(cluster, program, waveforms={}, weights={}, acquisitions={}):
         seq.sync_en(True)
         seq.thresholded_acq_trigger_en(True)
         seq.thresholded_acq_trigger_address(trigger_number)
-        seq.upload({
-            'program': 'stop',
+        seq.sequence({
+            'program': 'wait_sync 100\nstop\n',
             'waveforms': {},
             'weights': {},
             'acquisitions': {}
@@ -51,6 +55,8 @@ def run(cluster, program, waveforms={}, weights={}, acquisitions={}):
         qrm.arm_sequencer(seq_number)
 
     cluster.start_sequencer()
+    for seq_nr in range(3):
+        qrm.get_sequencer_status(seq_nr, 1.0)
     qrm.plot()
 
 
@@ -113,6 +119,7 @@ stop
 run(sim, program, waveforms)
 
 print('====')
+
 # %%
 plt.figure()
 program = '''

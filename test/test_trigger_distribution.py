@@ -4,6 +4,7 @@ import qcodes as qc
 from q1simulator import Cluster as SimCluster
 from qblox_instruments import Cluster
 
+
 def generate_waveforms():
     ''' Generates ramps '''
     waveforms = {}
@@ -24,7 +25,7 @@ class TestCluster:
         qc.Instrument.close_all()
         self.sim = sim
         if sim:
-            cluster = SimCluster('test', {1:'QCM', 2:'QRM'})
+            cluster = SimCluster('test', {1: 'QCM', 2: 'QRM'})
             qcm = cluster.module1
             # qcm.config('trace', True)
             qrm = cluster.module2
@@ -51,11 +52,10 @@ class TestCluster:
             seq = module.sequencers[1]
             seq.connect_out1('Q')
             seq.label = f"{module.name}-1"
-        for num in [0,1]:
+        for num in [0, 1]:
             seq = self.qrm.sequencers[num]
             seq.thresholded_acq_trigger_en(False)
             seq.integration_length_acq(100)
-
 
     def load(self, on_qcm, sequencer_number, program, waveforms={}, weights={}, acquisitions={}):
         if on_qcm:
@@ -72,8 +72,8 @@ class TestCluster:
         module.arm_sequencer(sequencer_number)
         self.armed.append([module.slot_idx, sequencer_number])
 
-    def trigger_out(self, sequencer_number, address, threshold:float,
-                    invert:bool=False):
+    def trigger_out(self, sequencer_number, address, threshold: float,
+                    invert: bool = False):
         seq = self.qrm.sequencers[sequencer_number]
         seq.thresholded_acq_trigger_en(True)
         seq.thresholded_acq_trigger_address(address)
@@ -90,14 +90,23 @@ class TestCluster:
         seq = module.sequencers[sequencer_number]
         seq.set_trigger_thresholding(address, count, invert)
 
+    def wait_stopped(self):
+        for module in self.cluster.modules:
+            if module.present():
+                for sequencer in module.sequencers:
+                    if sequencer.sync_en():
+                        sequencer.get_sequencer_status(1.0)
+
     def run(self):
         self.cluster.start_sequencer()
+        self.wait_stopped()
         if self.sim:
             pt.figure()
             self.qcm.plot()
             self.qrm.plot()
             pt.legend()
             pt.grid(True)
+
 
 def qcm_program(used_triggers):
     mask = 0
@@ -135,6 +144,7 @@ def qcm_program(used_triggers):
     stop
     '''
 
+
 def qrm_program(used_triggers):
     mask = 0
     for addr in used_triggers:
@@ -170,13 +180,14 @@ def qrm_program(used_triggers):
     stop
     '''
 
+
 sim = TestCluster(sim=True)
 waveforms = generate_waveforms()
 acquisitions = {
         "acq0": {"num_bins": 1, "index": 0},
         }
 
-n_rep = 20 #_000_000
+n_rep = 20
 
 
 # %%
@@ -273,5 +284,3 @@ except Exception as ex:
         print("Test OK.")
     else:
         raise
-
-

@@ -56,7 +56,6 @@ def plot_q1asm_files(plot_defs,
     sim.config('skip_loops', () if render_repetitions else ("_start", ))
     sim.config('skip_wait_sync', skip_wait_sync)
     # sim.config('trace', True)
-    sim.ignore_triggers = True
 
     for i, plot in enumerate(plot_defs):
         if plot.sequencer_name:
@@ -82,7 +81,7 @@ def plot_q1asm_files(plot_defs,
 
     for i, plot in enumerate(plot_defs):
         name = plot.sequencer_name if plot.sequencer_name else f'seq{i}'
-        print(f'State {name}: {sim.get_sequencer_status(i)}')
+        print(f'State {name}: {sim.get_sequencer_status(i, timeout=1.0)}')
 
     sim.plot(t_min=t_min, t_max=t_max)
     sim.print_acquisitions()

@@ -28,6 +28,6 @@ sqcr.sync_en = None
 sqcr.sequence(sequence)
 q1sim.arm_sequencer(0)
 q1sim.start_sequencer(0)
-q1sim.get_sequencer_status(0)
+q1sim.get_sequencer_status(0, timeout=1.0)
 q1sim.get_acquisition_status(0)
 data = q1sim.get_acquisitions(0)["testacq"]["acquisition"]["bins"]["integration"]
