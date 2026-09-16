@@ -24,29 +24,51 @@ The complete Q1ASM instruction set has been implemented.
 Q1Simulator simulates the (estimated) execution time of Q1ASM and
 uses buffer between Q1Core and real-time executor. It aborts execution
 when the real-time buffer would have an underrun.
-The renderer uses the uploaded waveforms and the nco frequency.
+The renderer uses the uploaded waveforms and the NCO frequency.
 
 Note: Currently all qcodes parameters of the simulator initialize to None.
 The parameters must explicitly be set.
+
+# Installation
+
+Q1Simulator visualization and GUI require Qt bindings for python.
+Make sure one of the following packages is installed: `PySide6`, `PySide2`, `PyQt6`,
+`PyQt`.
+
+Install Q1Simulator from git or from this repository code.
+
+```shell
+pip install "q1simulator@git+https://github.com/sldesnoo-Delft/q1simulator@v1.2.0"
+```
+
+```shell
+# clone or download source code from this repository
+pip install .
+```
 
 # Example
 
 ```Python
     from q1simulator import Q1Simulator as Module
 
-    sim = Module('q1sim', sim_type='QCM')
-    sim.sequencer0.sequence('my_sequence.json')
+    sim = Module("q1sim", sim_type="QCM")
+    sim.sequencer0.sync_en(True)
+    sim.sequencer0.connect_out0("I")
+    sim.sequencer0.sequence("./demo/demo_data/q1seq_P1.json")
     sim.arm_sequencer(0)
     sim.start_sequencer()
-    sim.get_sequencer_state(0)
+    sim.get_sequencer_status(0)
     sim.plot()
-    sim.print_acquisitions()
 ```
+
+You can find example sequences in the `./demo/demo_data` directory of this repository.
+
+
 
 # Cluster
 
 A simulated Cluster can be created with the modules
-specified in a dictionary with  slot number and module type.
+specified in a dictionary with the slot numbers and module types.
 
 ```Python
     from q1simulator import Cluster
@@ -123,7 +145,7 @@ and plots and prints the results.
 ```
 See demo directory for some examples.
 
-The viewer can be executed from the commandline to view a single sequence file:
+The viewer can be executed from the command line to view a single sequence file:
 `python -m q1simulator.q1viewer q1simulator\demo\demo_data\q1seq_P1.json`
 
 # Simulator rendering limits
@@ -187,7 +209,7 @@ All other methods and parameters only write the passed value to the logger.
 
 # Setting simulator acquisition data
 Acquisition mock data can be set with `set_acquisition_mock_data`.
-The data should passed in a list for multiple runs of the sequence.
+The data should be passed in a list for multiple runs of the sequence.
 For every run there should be a list with entries for every `acquire`
 call. The entry for an acquire call is used for both paths.
 If it is a single float value then it is used for both paths.
@@ -264,7 +286,7 @@ The simulator has some methods to show the simulator output.
 Q1Simulator has a logging feature to help with code debugging.
 It uses of special comment line in the Q1ASM code.
 The comment line should start with `#Q1Sim:` and is followed by the
-simulator log command with the format log "message",register,options.
+simulator log command with the format log "message", register, options.
 The options are:
 * R: log register value
 * T: log q1 and real-time executer time.
@@ -284,7 +306,7 @@ Output:
 
 # About Q1Simulator
 One day after I had been working on the generation of Q1ASM I thought
-it would be fun to write a interpreter to execute the generated Q1ASM.
+it would be fun to write an interpreter to execute the generated Q1ASM.
 A few hours later I had a parser, an interpreter and an output renderer
 plotting the output of the Q1ASM file that I had generated earlier
 that day. Above all it showed there was an error in the timing of
