@@ -132,9 +132,10 @@ class Q1Core:
                 if instr.reg_args is not None:
                     args = instr.args.copy()
                     for i in instr.reg_args:
-                        if i == self.updating_reg:
-                            raise Exception(f"Register R{i} cannot be read immediately after write.")
-                        args[i] = self.R[args[i]]
+                        reg_num = args[i]
+                        if reg_num == self.updating_reg:
+                            raise Exception(f"Register R{reg_num} cannot be read immediately after write.")
+                        args[i] = self.R[reg_num]
                 else:
                     args = instr.args
                 self.updating_reg = None
