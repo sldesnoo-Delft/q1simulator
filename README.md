@@ -35,14 +35,20 @@ Q1Simulator visualization and GUI require Qt bindings for python.
 Make sure one of the following packages is installed: `PySide6`, `PySide2`, `PyQt6`,
 `PyQt`.
 
-Install Q1Simulator from git or from this repository code.
-
+Install Q1Simulator from pypi:
 ```shell
-pip install "q1simulator@git+https://github.com/sldesnoo-Delft/q1simulator@v1.2.0"
+pip install q1simulator
 ```
 
+Install Q1Simulator from git:
+
 ```shell
-# clone or download source code from this repository
+pip install "q1simulator@git+https://github.com/sldesnoo-Delft/q1simulator"
+```
+
+Install from local repository:
+```shell
+# clone or download source code from local repository
 pip install .
 ```
 
@@ -119,7 +125,7 @@ the program to plot the expected outputs.
     plotter = Q1Plotter(my_cluster)
     plotter.plot()
 ```
-**NOTE: Only sequencers with `sync_en()==True` are copy to the simulator and plotted. **
+**NOTE: Only sequencers with `sync_en()==True` are simulated and plotted. **
 
 # Q1ASM file viewer
 `plot_q1asm_file` is a simple function that reads a file
@@ -184,6 +190,11 @@ the simulator and mimic behavior of the cluster / module / sequencer:
 - connect_sequencer
 - disconnect_inputs
 - disconnect_outputs
+- clear_router
+- set_cmm_route
+- set_broad_cast
+- set_sequencer_registers
+- get_sequencer_registers
 
 Simulated sequencer qcodes parameters:
 - gain_awg_pathX
@@ -206,6 +217,33 @@ Simulated sequencer qcodes parameters:
 - ttl_acq_auto_bin_incr_en
 
 All other methods and parameters only write the passed value to the logger.
+
+# Q1ASM
+
+Q1Simulator implements all Q1ASM instructions of QCM and QRM modules.
+The QTM specific instructions are not (yet) implemented. This is mainly
+because this hardware is not currently available for the developer.
+
+## ISA versions
+Q1Simulator implements Q1ASM ISA v1.0 and v2.0. By default it uses
+ISA v2.0 when qblox-instruments is >= 1.2.0. The ISA version can
+also be specified upon creation of the Cluster or Q1Simulator.
+
+# Concurrent execution of sequencers
+
+The exchange of information between sequencers, such as the triggers and
+feedback events require a degree of concurrent execution of the sequencers.
+
+`wait_sync` will synchronize the sequencers. This distribution of triggers
+and feedback events will be relative to this synchronization point.
+Latencies of triggers and feedback events are taken into account.
+
+Q1Simulator starts a Python thread for every sequencer and maintains a
+global system time. Threads in Python will not really run simultaneously and
+the local time of the sequencers will not be the same. At points where
+synchronization is needed, that is for `wait_sync`, conditional instructions,
+and reception of feedback events, a sequencer will wait till the other
+sequencers have reached the same local time.
 
 # Setting simulator acquisition data
 Acquisition mock data can be set with `set_acquisition_mock_data`.
@@ -256,9 +294,6 @@ Example:
 
 # Conditional execution
 The simulator generates triggers according to the acquisition thresholds.
-At startup the simulator determines the dependencies between trigger producers
-and trigger consumers. It executes the trigger producing sequencers
-before the trigger consuming sequencers.
 
 The simulator takes the trigger network latency into account, but does not
 check whether triggers overlap.
@@ -273,6 +308,19 @@ The condition evaluation can also be forced with the property `value_for_conditi
 of the module. If this value is 1 then OR, AND and XOR evaluate to true.
 If this value is 0 then NOR, NAND and XNOR evaluate to true.
 The feature is suitable for simple test.
+
+# LINQ-Based Feedback
+
+The feedback system is implemented for QCM and QRM with the following
+exceptions:
+* Intra-cast (module routing) is not (yet) implemented.
+* Latencies are taking into account, but queueing for bus access is not.
+  All events are delivered after specified delivery. When executed on the
+  hardware the events experience a larger latency, because they have
+  to wait in the queue till the bus is available.
+* The following Q1ASM instructions are not yet implemented due to
+  unclarities in the specification: `fb_acq_tb_extra`, `fb_acq_tb_mock`,
+  and `tb_com_extra`.
 
 # Simulator output
 The simulator has some methods to show the simulator output.
