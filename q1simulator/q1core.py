@@ -606,7 +606,8 @@ class Q1Core:
 
     @update_rt
     def _fb_acq_tb_mock(self, enable, valid, data, wait_after):
-        self.renderer.fb_acq_tb_mock(enable, valid, data, wait_after)
+        raise NotImplementedError()
+        # self.renderer.fb_acq_tb_mock(enable, valid, data, wait_after)
 
     @update_rt
     def _fb_com_data(self, event_id, data, wait_after):
