@@ -74,7 +74,10 @@ class SequencerQueue:
                     event.values = [d1 | d2 for d1, d2 in zip(event.values, combine.values)]
                 logger.info(f"Combined {event.event_id} ({event.event_time}): {event.values}")
             else:
-                logger.info(f"Event {event.event_id} ({event.event_time}): {event.values}")
+                if event.event_type == EventType.FEEDBACK:
+                    logger.info(f"Event {event.event_id} ({event.event_time}): {event.values}")
+                else:
+                    logger.info(f"Trigger {event.address} {event.state}")
             return event
         else:
             logger.debug(f"No event {max_time}")
@@ -194,8 +197,9 @@ class EventDistributor:
                 self._condition.wait()
             if wait:
                 logger.info(f"Sequencer {sequencer_name} continues")
-            if self._abort or sequencer_name not in self._abort_sequencers:
-                logger.info(f"Sequencer abort ({self._abort}, {sequencer_name in self._abort_sequencers})")
+            if self._abort or sequencer_name in self._abort_sequencers:
+                logger.info(f"Sequencer abort {sequencer_name} "
+                            f"({self._abort}, {sequencer_name in self._abort_sequencers})")
 
     def get_event(self, sequencer_name: str, rt_time: int) -> FeedbackEvent | TriggerEvent | None:
         """
@@ -269,6 +273,8 @@ class EventDistributor:
             t_delivery = t_send + latency
 
             targets = self._event_targets[event_id]
+            if not targets:
+                logger.info(f"No targets for event {event_id}")
             for target_name in targets:
                 logger.debug(f"event {event_id} -> {target_name} at {t_delivery}(sys) latency:{latency}")
                 sequencer_queue = self._sequencer_queue[target_name]
