@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.3.2] - 2026-09-23
+
+- Fixed trigger distribution
+- Fixed performance problem with numpy and multithreading.
+
 ## \[1.3.1] - 2026-09-17
 
 - Fixed register read after write check.
