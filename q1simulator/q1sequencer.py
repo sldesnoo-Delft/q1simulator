@@ -18,7 +18,6 @@ from qblox_instruments import (
     SequencerStates,
     )
 
-from .event_distributor import EventDistributor
 from .q1core import Q1Core
 from .qblox_version import Version, qblox_version
 from .scheduler import Scheduler, Task
@@ -404,12 +403,14 @@ class Q1Sequencer(InstrumentChannel, Task):
 
     def get_sequencer_status(self, timeout: int = 0, timeout_poll_res: float = 0.02):
         try:
+            if self.q1core.running:
+                # if running, sleep a bit to avoid that polling tasks claims the CPU core.
+                time.sleep(0.001)
             if timeout:
                 expiration_time = time.perf_counter() + timeout * 60.0
                 while not self._scheduler.join_sequencer(self.name):
                     if time.perf_counter() > expiration_time:
                         raise TimeoutError(f"Sequencer {self.name}")
-                    timeout_poll_res = 0.1
                     time.sleep(timeout_poll_res)
             else:
                 self._scheduler.join_sequencer(self.name)

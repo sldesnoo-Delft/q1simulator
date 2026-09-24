@@ -55,6 +55,7 @@ class Q1Core:
         self.instructions = []
         self.iptr = 0
         self.abort = False
+        self.running = False
         self._last_rt_update = 0
         self.exit_code = -1
         self.errors = set()
@@ -93,6 +94,7 @@ class Q1Core:
         return res
 
     def run(self):
+        self.running = True
         self.abort = False
         self._last_rt_update = 0
         self.errors = set()
@@ -166,6 +168,7 @@ class Q1Core:
             raise
         finally:
             np.seterr(**orig_err_settings)
+            self.running = False
 
         duration = time.perf_counter() - start
         logger.info(f'Duration {duration*1000:5.1f} ms {cntr} instructions, {duration/cntr*1e6:4.1f} us/instr')

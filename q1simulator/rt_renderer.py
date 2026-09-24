@@ -560,23 +560,6 @@ class Renderer:
             logger.error(f'{self.name}: wait_time ({time} ns) must be < 65535 ns')
             self._error('WAIT TIME > 65535 ns')
 
-        # WORKAROUND
-        # There is a performance issue with multithreaded execution and some numpy operations
-        # on arrays > 500 values. It looks like numpy releases the GIL and triggers thread
-        # switching. This drops performance to nearly zero.
-        # Rendering in small chunk keeps things fast.
-        chunk_size = 500
-        if time > chunk_size:
-            n, rem = divmod(time, chunk_size)
-            for _ in range(n):
-                self._render_chunk(chunk_size)
-            if rem > 0:
-                self._render_chunk(rem)
-            return
-        else:
-            self._render_chunk(time)
-
-    def _render_chunk(self, time):
         t_start = self.time
         t_end = t_start + int(time)
         self.time = t_end
