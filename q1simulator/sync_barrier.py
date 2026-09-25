@@ -16,6 +16,8 @@ class SyncBarrier:
     def remove_sequencer(self, sequencer_name: str):
         self._sequencers.discard(sequencer_name)
         self._abort_sequencers.discard(sequencer_name)
+        with self._condition:
+            self._condition.notify_all()
 
     def abort_sequencer(self, sequencer_name: str):
         self._abort_sequencers.add(sequencer_name)

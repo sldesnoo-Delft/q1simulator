@@ -151,6 +151,7 @@ class Q1Sequencer(InstrumentChannel, Task):
         self._scope_data = {}
         self.output_selected_path = ['off'] * 4
         self._paths_used = [False, False]
+        self._sync_en(False)
         self.run_state = 'IDLE'
         self.rt_renderer = Renderer(self.name, self._event_distributor)
         self.rt_renderer.trace_enabled = self._trace
@@ -504,6 +505,7 @@ class Q1Sequencer(InstrumentChannel, Task):
     def stop_sequencer(self):
         if self.run_state in ["RUNNING", "ARMED"]:
             self.abort()
+        self._event_distributor.set_sequencer_sync_en(self.name, False)
         self.run_state = "STOPPED"
 
     def run(self):
