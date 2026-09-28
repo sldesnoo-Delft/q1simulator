@@ -7,13 +7,13 @@ import qcodes as qc
 
 from qblox_instruments import (
         InstrumentClass, InstrumentType,
-        SystemStatuses, SystemStatus, SystemStatusSlotFlags,
-        )
+        SystemStatuses, SystemStatus, SystemStatusSlotFlags
+)
 
 from .event_distributor import EventDistributor
 from .qblox_version import check_qblox_instrument_version
 from .q1module import Q1Module
-from .q1sequencer import Q1Sequencer
+from .q1sequencer import Q1Sequencer, SupportedISAVersions, SupportedSimulatorTypes
 from .scheduler import Scheduler
 
 
@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 class ClusterModule(qc.InstrumentChannel, Q1Module):
     def __init__(self, root_instrument, name: str, slot: int, scheduler: Scheduler, *,
                  n_sequencers: int = 6,
-                 sim_type: str | None = None,
-                 isa_version: tuple[int, int] | None = None):
+                 sim_type: SupportedSimulatorTypes,
+                 isa_version: SupportedISAVersions | None = None):
         super().__init__(root_instrument, name)
         self._slot = slot
         super().init_module(n_sequencers, sim_type, scheduler, isa_version=isa_version)
@@ -53,7 +53,7 @@ class Cluster(qc.Instrument):
         'trigger_monitor_latest',
         ]
 
-    def __init__(self, name, modules={}, isa_version: tuple[int, int] | None = None):
+    def __init__(self, name, modules: dict = None, isa_version: SupportedISAVersions | None = None):
         check_qblox_instrument_version()
         if qc.Instrument.exist(name):
             logger.info(f"Closing old simulator with same name ({name})")
@@ -61,6 +61,9 @@ class Cluster(qc.Instrument):
             if not str(old.__class__) == str(Cluster):
                 raise Exception(f"Oops, existing instrument '{name}' is not a cluster")
             old.close()
+
+        if modules is None:
+            modules = {}
 
         super().__init__(name)
 

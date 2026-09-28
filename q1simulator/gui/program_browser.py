@@ -41,8 +41,8 @@ class Q1ProgramBrowser(QtWidgets.QMainWindow):
         global _app
         logger.debug("Init program browser")
 
-        qt_app_runing = qt_init()
-        if not qt_app_runing:
+        qt_app_running = qt_init()
+        if not qt_app_running:
             # note: store reference to avoid garbage collection.
             # reference is also used to restart browser 2nd time in Python console.
             _app = qt_create_app()

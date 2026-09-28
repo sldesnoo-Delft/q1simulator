@@ -21,7 +21,7 @@ class AnalogueFilter:
             amplitude_correction = 1.003
             self.min_vstep = 5.0/2**16  # 0.076 mV
         else:
-            raise Exception(f"Uknown model_name {model_name}")
+            raise Exception(f"Unknown model_name {model_name}")
 
         pulse_response = xr.open_dataset(fname, engine='h5netcdf')
         t_response = pulse_response.coords['t'].data

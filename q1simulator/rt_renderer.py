@@ -758,7 +758,7 @@ class Renderer:
             self._event_distributor.emit_trigger(self.name, t_end, acq_conf.trigger_addr, trigger_state)
             self._trace(f'Trigger {acq_conf.trigger_addr} {t_end} {trigger_state}')
 
-        # Always sent afer fixed integration time!
+        # Always sent after fixed integration time!
         event_time = self.time + self.acq_conf.length
         # TB is sent before IQ.
         fb_tb_conf = self.fb_tb_conf

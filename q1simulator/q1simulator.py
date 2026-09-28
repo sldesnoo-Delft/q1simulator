@@ -6,18 +6,18 @@ import matplotlib.pyplot as pt
 
 from .event_distributor import EventDistributor
 from .q1module import Q1Module
-from .q1sequencer import Q1Sequencer
+from .q1sequencer import Q1Sequencer, SupportedSimulatorTypes, SupportedISAVersions
 from .qblox_version import check_qblox_instrument_version
 from .scheduler import Scheduler
 
 from qblox_instruments import (
     InstrumentClass, InstrumentType,
     SystemStatuses, SystemStatus, SystemStatusSlotFlags,
+    ClusterType
 )
 
 
 logger = logging.getLogger(__name__)
-
 
 class Q1Simulator(Q1Module):
     _pulsar_parameters = [
@@ -27,7 +27,27 @@ class Q1Simulator(Q1Module):
         'led_brightness',
     ]
 
-    def __init__(self, name, n_sequencers=6, sim_type=None, isa_version: tuple[int, int] | None = None):
+    def __init__(
+        self,
+        name: str,
+        sim_type: SupportedSimulatorTypes,
+        n_sequencers=6,
+        isa_version: tuple[int, int] | None = None
+    ):
+        """
+        Q1 instrument simulator.
+
+        Parameters
+        ----------
+        name : str
+            Identifier for the instrument.
+        sim_type : SupportedSimulatorTypes
+            Either a module type (QCM), Viewer or a ClusterType (Cluster QCM).
+        n_sequencers : int, optional
+            Number of sequencers in simulated instrument, by default 6
+        isa_version : SupportedISAVersions | None, optional
+            Supported q1asm ISA version.
+        """
         check_qblox_instrument_version()
         super().__init__(name)
         scheduler = Scheduler(EventDistributor())
@@ -94,14 +114,17 @@ class Q1Simulator(Q1Module):
         logger.info(f'{self.name}: {name}={value}')
 
     def plot(self,
-             t_min: float = None,
-             t_max: float = None,
+             t_min: float | None = None,
+             t_max: float | None = None,
              channels: list[str] | list[int] | None = None,
              analogue_filter: bool = False,
              analogue_output_frequency: float = 4e9,
              output_per_sequencer: bool = True,
-             **kwargs):
+             **kwargs
+        ):
         """Plots the simulated output of the module.
+
+        Only plots output for the sequencers with sync_en(True)
 
         Args:
             t_min: minimum time in the plot.
