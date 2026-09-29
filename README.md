@@ -24,29 +24,57 @@ The complete Q1ASM instruction set has been implemented.
 Q1Simulator simulates the (estimated) execution time of Q1ASM and
 uses buffer between Q1Core and real-time executor. It aborts execution
 when the real-time buffer would have an underrun.
-The renderer uses the uploaded waveforms and the nco frequency.
+The renderer uses the uploaded waveforms and the NCO frequency.
 
 Note: Currently all qcodes parameters of the simulator initialize to None.
 The parameters must explicitly be set.
+
+# Installation
+
+Q1Simulator visualization and GUI require Qt bindings for python.
+Make sure one of the following packages is installed: `PySide6`, `PySide2`, `PyQt6`,
+`PyQt`.
+
+Install Q1Simulator from pypi:
+```shell
+pip install q1simulator
+```
+
+Install Q1Simulator from git:
+
+```shell
+pip install "q1simulator@git+https://github.com/sldesnoo-Delft/q1simulator"
+```
+
+Install from local repository:
+```shell
+# clone or download source code from local repository
+pip install .
+```
 
 # Example
 
 ```Python
     from q1simulator import Q1Simulator as Module
 
-    sim = Module('q1sim', sim_type='QCM')
-    sim.sequencer0.sequence('my_sequence.json')
+    sim = Module("q1sim", sim_type="QCM")
+    sim.sequencer0.sync_en(True)
+    sim.sequencer0.connect_out0("I")
+    sim.sequencer0.sequence("./demo/demo_data/q1seq_P1.json")
     sim.arm_sequencer(0)
     sim.start_sequencer()
-    sim.get_sequencer_state(0)
+    sim.get_sequencer_status(0)
     sim.plot()
-    sim.print_acquisitions()
 ```
+
+You can find example sequences in the `./demo/demo_data` directory of this repository.
+
+
 
 # Cluster
 
 A simulated Cluster can be created with the modules
-specified in a dictionary with  slot number and module type.
+specified in a dictionary with the slot numbers and module types.
 
 ```Python
     from q1simulator import Cluster
@@ -97,7 +125,7 @@ the program to plot the expected outputs.
     plotter = Q1Plotter(my_cluster)
     plotter.plot()
 ```
-**NOTE: Only sequencers with `sync_en()==True` are copy to the simulator and plotted. **
+**NOTE: Only sequencers with `sync_en()==True` are simulated and plotted. **
 
 # Q1ASM file viewer
 `plot_q1asm_file` is a simple function that reads a file
@@ -123,7 +151,7 @@ and plots and prints the results.
 ```
 See demo directory for some examples.
 
-The viewer can be executed from the commandline to view a single sequence file:
+The viewer can be executed from the command line to view a single sequence file:
 `python -m q1simulator.q1viewer q1simulator\demo\demo_data\q1seq_P1.json`
 
 # Simulator rendering limits
@@ -162,6 +190,11 @@ the simulator and mimic behavior of the cluster / module / sequencer:
 - connect_sequencer
 - disconnect_inputs
 - disconnect_outputs
+- clear_router
+- set_cmm_route
+- set_broad_cast
+- set_sequencer_registers
+- get_sequencer_registers
 
 Simulated sequencer qcodes parameters:
 - gain_awg_pathX
@@ -185,9 +218,36 @@ Simulated sequencer qcodes parameters:
 
 All other methods and parameters only write the passed value to the logger.
 
+# Q1ASM
+
+Q1Simulator implements all Q1ASM instructions of QCM and QRM modules.
+The QTM specific instructions are not (yet) implemented. This is mainly
+because this hardware is not currently available for the developer.
+
+## ISA versions
+Q1Simulator implements Q1ASM ISA v1.0 and v2.0. By default it uses
+ISA v2.0 when qblox-instruments is >= 1.2.0. The ISA version can
+also be specified upon creation of the Cluster or Q1Simulator.
+
+# Concurrent execution of sequencers
+
+The exchange of information between sequencers, such as the triggers and
+feedback events require a degree of concurrent execution of the sequencers.
+
+`wait_sync` will synchronize the sequencers. This distribution of triggers
+and feedback events will be relative to this synchronization point.
+Latencies of triggers and feedback events are taken into account.
+
+Q1Simulator starts a Python thread for every sequencer and maintains a
+global system time. Threads in Python will not really run simultaneously and
+the local time of the sequencers will not be the same. At points where
+synchronization is needed, that is for `wait_sync`, conditional instructions,
+and reception of feedback events, a sequencer will wait till the other
+sequencers have reached the same local time.
+
 # Setting simulator acquisition data
 Acquisition mock data can be set with `set_acquisition_mock_data`.
-The data should passed in a list for multiple runs of the sequence.
+The data should be passed in a list for multiple runs of the sequence.
 For every run there should be a list with entries for every `acquire`
 call. The entry for an acquire call is used for both paths.
 If it is a single float value then it is used for both paths.
@@ -234,9 +294,6 @@ Example:
 
 # Conditional execution
 The simulator generates triggers according to the acquisition thresholds.
-At startup the simulator determines the dependencies between trigger producers
-and trigger consumers. It executes the trigger producing sequencers
-before the trigger consuming sequencers.
 
 The simulator takes the trigger network latency into account, but does not
 check whether triggers overlap.
@@ -252,6 +309,19 @@ of the module. If this value is 1 then OR, AND and XOR evaluate to true.
 If this value is 0 then NOR, NAND and XNOR evaluate to true.
 The feature is suitable for simple test.
 
+# LINQ-Based Feedback
+
+The feedback system is implemented for QCM and QRM with the following
+exceptions:
+* Intra-cast (module routing) is not (yet) implemented.
+* Latencies are taking into account, but queueing for bus access is not.
+  All events are delivered after specified delivery. When executed on the
+  hardware the events experience a larger latency, because they have
+  to wait in the queue till the bus is available.
+* The following Q1ASM instructions are not yet implemented due to
+  unclarities in the specification: `fb_acq_tb_extra`, `fb_acq_tb_mock`,
+  and `tb_com_extra`.
+
 # Simulator output
 The simulator has some methods to show the simulator output.
 - `plot()` shows pyplot charts with the rendered output.
@@ -264,7 +334,7 @@ The simulator has some methods to show the simulator output.
 Q1Simulator has a logging feature to help with code debugging.
 It uses of special comment line in the Q1ASM code.
 The comment line should start with `#Q1Sim:` and is followed by the
-simulator log command with the format log "message",register,options.
+simulator log command with the format log "message", register, options.
 The options are:
 * R: log register value
 * T: log q1 and real-time executer time.
@@ -284,7 +354,7 @@ Output:
 
 # About Q1Simulator
 One day after I had been working on the generation of Q1ASM I thought
-it would be fun to write a interpreter to execute the generated Q1ASM.
+it would be fun to write an interpreter to execute the generated Q1ASM.
 A few hours later I had a parser, an interpreter and an output renderer
 plotting the output of the Q1ASM file that I had generated earlier
 that day. Above all it showed there was an error in the timing of

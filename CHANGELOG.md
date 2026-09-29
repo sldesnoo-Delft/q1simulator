@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.3.1] - 2026-09-17
+
+- Fixed register read after write check.
+- Update README.MD.
+
 ## \[1.3.0] - 2026-09-14
 
 - compatible with qblox-instruments v1.3.1

@@ -1,5 +1,5 @@
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import matplotlib.pyplot as pt
 from qcodes import Instrument
@@ -11,12 +11,12 @@ from .q1simulator import Q1Simulator
 class PlotDef:
     filename: str
     sequencer_name: str | None = None
-    out: list[int] = field(default_factory=lambda: [0, 1])
+    out: tuple[int, ...] = (0, 1)
     lo_frequency: float | None = None
 
 
 def plot_q1asm_file(filename,
-                    out=[0, 1],
+                    out=(0, 1),
                     lo_frequency=None,
                     max_render_time=2e6,
                     max_core_cycles=1e7,
