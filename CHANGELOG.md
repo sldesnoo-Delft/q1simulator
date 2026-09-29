@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.3.4] - 2026-09-29
+
+- Fixed hanging threads in synchronization after stopping and restarting sequencers.
+- Fixed forced trigger state used in testing.
+
 ## \[1.3.3] - 2026-09-24
 
 - Really fixed performance problem with multithreading
