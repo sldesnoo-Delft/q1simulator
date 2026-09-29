@@ -660,8 +660,8 @@ class Renderer:
             state = self.forced_condition_value == 1
             match = state if op in [0, 2, 4] else not state
             self._trace(f'Cond {match} {state}')
-            skip_rt = not match
-            return skip_rt
+            self.skip_rt = not match
+            return
 
         bits_set = np.sum(state)
         bits_mask = np.sum(self.condition_mask)
