@@ -4,7 +4,8 @@ import re
 import time
 from dataclasses import dataclass
 from functools import partial
-from typing import Iterator, Iterable
+from typing import Literal
+from collections.abc import Iterator, Iterable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -16,7 +17,8 @@ from qblox_instruments import (
     SequencerStatuses,
     SequencerStatusFlags,
     SequencerStates,
-    )
+    ClusterType
+)
 
 from .q1core import Q1Core
 from .qblox_version import Version, qblox_version
@@ -25,6 +27,10 @@ from .rt_renderer import Renderer, MockDataEntry
 
 
 logger = logging.getLogger(__name__)
+
+SupportedISAVersions = tuple[Literal[1], Literal[0]] | tuple[Literal[2], Literal[0]]
+
+SupportedSimulatorTypes = Literal["QCM", "QCM-RF", "QRM", "QRM-RF", "Viewer", ClusterType.CLUSTER_QCM, ClusterType.CLUSTER_QCM_RF, ClusterType.CLUSTER_QRM, ClusterType.CLUSTER_QRM_RF]
 
 MockDataType = Iterable[MockDataEntry]
 
@@ -58,8 +64,8 @@ class Q1Sequencer(InstrumentChannel, Task):
         'nco_prop_delay_comp_en',
         ]
 
-    def __init__(self, parent, name, sim_type, idx, scheduler: Scheduler,
-                 isa_version: tuple[int, int] | None = None):
+    def __init__(self, parent, name, sim_type: SupportedSimulatorTypes, idx, scheduler: Scheduler,
+                 isa_version: SupportedISAVersions | None = None):
         super().__init__(parent, name)
         if isa_version is not None:
             if isa_version not in [(1, 0), (2, 0)]:

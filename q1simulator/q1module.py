@@ -8,7 +8,7 @@ import qcodes as qc
 from numpy.typing import NDArray
 
 from .channel_data import MarkerOutput, SampledOutput
-from .q1sequencer import Q1Sequencer
+from .q1sequencer import Q1Sequencer, SupportedISAVersions, SupportedSimulatorTypes
 from .scheduler import Scheduler
 
 from qblox_instruments import InstrumentType
@@ -83,9 +83,34 @@ class Q1Module(qc.instrument.InstrumentBase):
 
     # NOTE: No __init__() !!!
     # This class is used as a mixin. Although quite heavy mixin.
+    def init_module(
+        self,
+        n_sequencers: int,
+        sim_type: SupportedSimulatorTypes,
+        scheduler: Scheduler,
+        isa_version: SupportedISAVersions | None = None
+    ):
+        """
+        Allows inheriting class or caller to use simulated module methods.
 
-    def init_module(self, n_sequencers: int, sim_type: str, scheduler: Scheduler,
-                    isa_version: tuple[int, int] | None = None):
+        Parameters
+        ----------
+        n_sequencers : int
+            Number of sequencers in a module.
+        sim_type : SupportedSimulatorTypes
+            Either a module type (QCM), Viewer or a ClusterType (Cluster QCM).
+        scheduler : Scheduler
+            Scheduler to manage sequencer threads lifecycle.
+        isa_version : SupportedISAVersions | None, optional
+            Supported q1asm ISA version.
+        
+        Raises
+        ------
+        Exception
+            If no sim_type is specified.
+        ValueError
+            If sim type is not supported
+        """                    
 
         # When using the qblox_instruments ClusterType class,
         # for example ClusterType.CLUSTER_QCM,
@@ -102,7 +127,7 @@ class Q1Module(qc.instrument.InstrumentBase):
         self._is_rf = sim_type in ['QCM-RF', 'QRM-RF']
 
         if not (self._is_qcm or self._is_qrm):
-            raise ValueError(f'Unknown sim_type: {sim_type}')
+            raise ValueError(f'Unsupported sim_type: {sim_type}')
 
         self._scheduler = scheduler
 
@@ -153,7 +178,7 @@ class Q1Module(qc.instrument.InstrumentBase):
         self.sequencers = [
             Q1Sequencer(self, f'sequencer{i}', sim_type, i, scheduler, isa_version=isa_version)
             for i in range(n_sequencers)
-            ]
+        ]
         for i, seq in enumerate(self.sequencers):
             self.add_submodule(f'sequencer{i}', seq)
 
@@ -328,13 +353,14 @@ class Q1Module(qc.instrument.InstrumentBase):
         return max(seq.get_simulation_end_time() for seq in self.sequencers)
 
     def plot(self,
-             t_min: float = None,
-             t_max: float = None,
+             t_min: float | None = None,
+             t_max: float | None = None,
              channels: list[str] | list[int] | None = None,
              analogue_filter: bool = False,
              analogue_output_frequency: float = 4e9,
              output_per_sequencer: bool = True,
-             **kwargs):
+             **kwargs
+    ):
 
         output = self.get_output(t_min, t_max, channels,
                                  analogue_filter, analogue_output_frequency,
@@ -397,8 +423,8 @@ class Q1Module(qc.instrument.InstrumentBase):
                 pt.plot(t, q, ":", label="ACQ:"+q_label)
 
     def get_output(self,
-                   t_min: float = None,
-                   t_max: float = None,
+                   t_min: float | None = None,
+                   t_max: float | None = None,
                    channels: list[str] | list[int] | None = None,
                    analogue_filter: bool = False,
                    output_frequency: float = 4e9,
