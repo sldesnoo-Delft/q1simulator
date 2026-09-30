@@ -64,9 +64,6 @@ class Cluster(qc.Instrument):
                 raise Exception(f"Oops, existing instrument '{name}' is not a cluster")
             old.close()
 
-        if modules is None:
-            modules = {}
-
         super().__init__(name)
 
         self._event_distributor = EventDistributor()
