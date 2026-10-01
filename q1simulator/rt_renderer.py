@@ -22,12 +22,13 @@ MockDataEntry = float | complex | Sequence[float]
 
 
 def clip_np16_sum(a: np.int16, b: np.int16) -> np.int16:
-    """Clip int16 sum overflow instead of default wrapping."""
+    """Clip sum of two int16 on overflow instead of default wrapping ."""
     return np.int16(
         (np.int16(a) + np.int32(b)).clip(-32768, 32767)
     )
 
 def clip_np_16_product(a: np.int16, b: np.int16) -> np.int16:
+    """Clip product of two int16 on overflow instead of default wrapping ."""
     return np.int16(
         (np.int16(a) * np.int32(b)).clip(-32768, 32767)
     )
@@ -38,6 +39,7 @@ class Settings:
     awg_offs_qcodes: np.ndarray = field(default_factory=lambda: np.zeros(2, np.int16))
     awg_offs: np.ndarray = field(default_factory=lambda: np.zeros(2, np.int16))
     awg_gain: np.ndarray = field(default_factory=lambda: np.full(2, 32767, np.int16))
+    awg_gain_qcodes: np.ndarray = field(default_factory=lambda: np.full(2, 1.0, np.int16))
     reset_phase: bool = False
     relative_phase: float | None = None
     phase_shift: float = 0
@@ -299,7 +301,6 @@ class Renderer:
     def set_awg_gain(self, gain0, gain1):
         self.next_settings.awg_gain[:] = gain0, gain1
 
-
     def set_awg_offs(self, offset0, offset1):
         self.next_settings.awg_offs[:] = (
             offset0,
@@ -474,7 +475,7 @@ class Renderer:
 
     # def fb_com_extra(self, valid, data, wait_after):
     #     ... # Not implemented
-    
+ 
     def fb_event_pop(self) -> FeedbackQueueEntry | None:
         self._trace("fb_event_pop")
         self._process_events()
@@ -599,10 +600,11 @@ class Renderer:
 
         # TODO only render if path active!
         for i in range(2):
+            combined_gain = clip_np_16_product(s.awg_gain[i], s.awg_gain_qcodes[i])
             if self.waves_end[i] > t_start:
                 end = min(self.waves_end[i], t_end)
                 data = self.waves[i][t_start-self.wave_start:end-self.wave_start]
-                path[i][0:len(data)] += (s.awg_gain[i] * data) >> 15
+                path[i][0:len(data)] += (combined_gain * data) >> 15
 
         if self.mod_en_awg:
             t = np.arange(t_start, t_end)
