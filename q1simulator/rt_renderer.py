@@ -21,13 +21,23 @@ logger = logging.getLogger(__name__)
 MockDataEntry = float | complex | Sequence[float]
 
 
+def clip_np16_sum(a: np.int16, b: np.int16) -> np.int16:
+    """Clip int16 sum overflow instead of default wrapping."""
+    return np.int16(
+        (np.int16(a) + np.int32(b)).clip(-32768, 32767)
+    )
+
+def clip_np_16_product(a: np.int16, b: np.int16) -> np.int16:
+    return np.int16(
+        (np.int16(a) * np.int32(b)).clip(-32768, 32767)
+    )
+
 @dataclass
 class Settings:
     marker: int = 0
     awg_offs_qcodes: np.ndarray = field(default_factory=lambda: np.zeros(2, np.int16))
     awg_offs: np.ndarray = field(default_factory=lambda: np.zeros(2, np.int16))
     awg_gain: np.ndarray = field(default_factory=lambda: np.full(2, 32767, np.int16))
-    awg_gain_qcodes: np.ndarray = field(default_factory=lambda: np.full(2, 32767, np.int16))
     reset_phase: bool = False
     relative_phase: float | None = None
     phase_shift: float = 0
@@ -201,7 +211,7 @@ class Renderer:
         self.t_sync = 0
 
     def gain_awg_path(self, gain, path):
-        self.next_settings.awg_gain_qcodes[path] = gain
+        self.next_settings.awg_gain[path] = gain
 
     def offset_awg_path(self, offset, path):
         self.next_settings.awg_offs_qcodes[path] = offset
@@ -287,15 +297,13 @@ class Renderer:
         self.next_settings.phase_shift = _phase2float(phase_delta)
 
     def set_awg_gain(self, gain0, gain1):
-        self.next_settings.awg_gain[:] = (
-            self.next_settings.awg_gain_qcodes[0] * gain0,
-            self.next_settings.awg_gain_qcodes[0] * gain1
-        )
+        self.next_settings.awg_gain[:] = gain0, gain1
+
 
     def set_awg_offs(self, offset0, offset1):
         self.next_settings.awg_offs[:] = (
-            self.next_settings.awg_offs_qcodes[0] + offset0,
-            self.next_settings.awg_offs_qcodes[1] + offset1
+            offset0,
+            offset1
         )
 
     @check_conditional(clear_latched_settings=True)
@@ -466,7 +474,7 @@ class Renderer:
 
     # def fb_com_extra(self, valid, data, wait_after):
     #     ... # Not implemented
-
+    
     def fb_event_pop(self) -> FeedbackQueueEntry | None:
         self._trace("fb_event_pop")
         self._process_events()
@@ -586,11 +594,10 @@ class Renderer:
         s = self.settings
 
         path = np.zeros((2, t_render), dtype=np.int16)
-        path[0] = s.awg_offs[0]
-        path[1] = s.awg_offs[1]
+        path[0] = clip_np16_sum(s.awg_offs_qcodes[0], s.awg_offs[0])
+        path[1] = clip_np16_sum(s.awg_offs_qcodes[1], s.awg_offs[1])
 
         # TODO only render if path active!
-
         for i in range(2):
             if self.waves_end[i] > t_start:
                 end = min(self.waves_end[i], t_end)
