@@ -4,3 +4,4 @@
 test:
   script:
     - echo "Test."
+    - echo "Test test"
