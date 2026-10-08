@@ -1,0 +1,37 @@
+#-- Static analysis stage -----------------------------------------------------
+pre-commit:
+  stage: Static Analysis
+  extends:
+    - .runner_lint
+  when: manual
+  allow_failure: true
+  script:
+    - pre-commit install
+    - pre-commit run --all-files --show-diff-on-failure --color always|| FAILED=true
+    - |
+      if [ $FAILED ]; then
+        echo ""
+        echo "pre-commit found issues. Either resolve manually or install pre-commit locally and run it there."
+        echo "To run locally execute the following in the terminal:"
+        echo "`pre-commit install`"
+        echo "`pre-commit run --all-files`"
+        exit 1
+      fi
+pyright:
+  stage: Static Analysis
+  extends:
+    - .runner_lint
+  when: manual
+  allow_failure: true
+  script:
+    - pyright --outputjson > report_raw.json || FAILED=true
+    - pyright || FAILED=true
+    - |
+      if [ $FAILED ]; then
+        echo ""
+        echo "pyright found issues, please resolve them. Run `pyright` in the terminal to get a local report."
+        exit 1
+      fi
+  artifacts:
+    reports:
+      codequality: pyright-report.json

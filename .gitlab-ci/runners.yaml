@@ -1,0 +1,46 @@
+.runner_lint:
+  image:
+    name: ghcr.io/astral-sh/uv:debian
+    pull_policy: always
+  before_script:
+    - uv venv
+    - source .venv/bin/activate
+    - uv pip install .[lint]
+  tags:
+    - qblox-fieldlab
+  interruptible: true
+.runner_base:
+  image:
+    name: ghcr.io/astral-sh/uv:debian
+    pull_policy: always
+  before_script:
+    - uv venv
+    - source .venv/bin/activate
+    - uv pip install .
+    - uv pip install qblox_instruments==$QBLOX_INSTRUMENTS_VER
+  tags:
+    - qblox-fieldlab
+  interruptible: true
+  artifacts:
+    when: always # save artifact even if job failed
+    expire_in: 2 weeks
+    paths:
+      - results/
+.runner_dummy:
+  extends: .runner_base
+  parallel:
+    matrix:
+      # dummy does not need a firmware specification, so this is 1d
+      - QBLOX_INSTRUMENTS_VER: ["1.2.2", "1.2.1"]
+  variables:
+    DUMMY: true
+.runner_hardware:
+  extends: .runner_base
+  resource_group: cluster-hilaas
+  parallel:
+    matrix:
+      # every entry in this list is a software/firmware combination
+      - QBLOX_INSTRUMENTS_VER: "1.2.2"
+        FIRMWARE_VER: "v2.0.0"
+  variables:
+    DUMMY: false
