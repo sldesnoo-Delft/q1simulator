@@ -1,6 +1,106 @@
+# SPDX-FileCopyrightText: © 2026 Qblox <https://qblox.com>
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Pipeline inputs. These render as a form on the GitLab "Run pipeline" page, so
+# you can start a pipeline from the web UI and pick where it runs and what runs.
+spec:
+  inputs:
+    target:
+      default: dummy
+      options:
+        - dummy
+        - hardware
+      description: "Run against the simulated (dummy) cluster or the real hardware."
+    pytest_args:
+      default: ""
+      description: "Extra pytest arguments to choose what runs. Use a keyword like `-k loopback`, or one or more paths from the repo root separated by spaces, e.g. `tests/test_loopback_demo.py tests/test_nco_control.py`. Empty runs the whole suite."
+---
+#-- Configuration -------------------------------------------------------------
+# Pipeline stages
+stages:
+  - Flash
+  - Static Analysis
+  - Executing
+# Pipeline variables
 
+# These are variables which are defined for the pipeline only.
+variables:
+  QT_DEBUG_PLUGINS: 0 # change to `1` when facing issues with Qt
+  QT_QPA_PLATFORM: offscreen # disable PlotMon from actually plotting
+  FORCE_COLOR: True
+  GIT_CLEAN_FLAGS: -ffdx
+  GIT_CLONE_PATH: $CI_BUILDS_DIR/$CI_CONCURRENT_ID
+  TOKENIZERS_PARALLELISM: false # Workaround for failures in parallel execution, see DEVOPS-1056
+  # Derived from the pipeline inputs above. `TARGET` selects which test job runs
+  # (dummy vs hardware); `PYTEST_ARGS` is forwarded to pytest to select files.
+  TARGET: "$[[ inputs.target ]]"
+  PYTEST_ARGS: "$[[ inputs.pytest_args ]]"
+include:
+  - '/.gitlab-ci/runners.yaml'
+  - '/.gitlab-ci/lint.yaml'
+# In GitLab CI/CD, workflow is a special keyword that allows you
+# to define a set of rules that apply to the entire pipeline.
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+#-- Executing stage -------------------------------------------------------------
 
-
-test:
+flash cluster:
+  stage: Flash
+  needs: []
+  extends:
+    - .runner_hardware
   script:
-    - echo "Test."
+    # The number can be a release, or gitlab tag (rc) or git ref (git hash)
+    - bash src/qblox_hilaas/flash_cluster.sh $FIRMWARE_VER
+  manual_confirmation: "Flash firmware?"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: always
+      allow_failure: false
+    - when: manual
+      allow_failure: true
+  artifacts:
+    paths:
+      - cluster_mm_release.tar.gz
+    expire_in: 1 week
+    when: on_failure
+#-- Executing stage -------------------------------------------------------------
+
+test on dummy:
+  stage: Executing
+  needs: []
+  extends:
+    - .runner_dummy
+  script:
+    - pytest ${PYTEST_ARGS}
+  rules:
+    - if: $TARGET == "dummy"
+test on hardware:
+  stage: Executing
+  needs: []
+  extends:
+    - .runner_hardware
+  script:
+    - pytest ${PYTEST_ARGS}
+  rules:
+    # Nightly / scheduled runs always exercise the hardware.
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: always
+      allow_failure: false
+    # Selected explicitly from the "Run pipeline" inputs -> run automatically.
+    - if: $TARGET == "hardware"
+    # Otherwise keep it as a manual button in every pipeline (e.g. from an MR).
+    - if: $CI_COMMIT_REF_PROTECTED == "true"
+      when: manual
+      allow_failure: false
+    - when: manual
+      allow_failure: true
+  timeout: 60m
