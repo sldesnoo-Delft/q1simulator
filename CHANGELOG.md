@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.3.5] - 2026-11-02
+
+- Fix performance issue.
+
 ## \[1.3.4] - 2026-09-29
 
 - Fixed hanging threads in synchronization after stopping and restarting sequencers.
