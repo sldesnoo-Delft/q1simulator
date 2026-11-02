@@ -35,6 +35,7 @@ def update_rt(func):
         rt_time = self.renderer.time
         if rt_time - self._last_rt_update > 1000:
             self.event_distributor.set_sequencer_time(self.name, self.renderer.time)
+            self._last_rt_update = rt_time
     return wrapper
 
 
