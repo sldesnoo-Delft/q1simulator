@@ -55,7 +55,7 @@ class Cluster(qc.Instrument):
 
     def __init__(self, name, modules: dict | None = None, isa_version: tuple[int, int] | None = None):
         if modules is None:
-           modules = {}
+            modules = {}
         check_qblox_instrument_version()
         if qc.Instrument.exist(name):
             logger.info(f"Closing old simulator with same name ({name})")
