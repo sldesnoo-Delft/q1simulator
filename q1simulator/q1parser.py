@@ -82,7 +82,7 @@ mnemonic_args_v1 = {
 # Note: first character is integer type.
 mnemonic_args_v2 = {
     "illegal": "",
-    "stop": "S?",
+    "stop": "SR?",
     "nop": "",
     "jmp": "ARL",
     "jz": "ARL",
