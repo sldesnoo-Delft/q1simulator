@@ -597,8 +597,8 @@ class Q1Core:
         self.renderer.fb_acq_tb_id(event_id, wait_after)
 
     @update_rt
-    def _fb_acq_tb_cfg(self, write_combine, bit_pos, length, wait_after):
-        self.renderer.fb_acq_tb_cfg(write_combine, bit_pos, length, wait_after)
+    def _fb_acq_tb_cfg(self, write_combine, shift, len, wait_after):
+        self.renderer.fb_acq_tb_cfg(write_combine, shift, len, wait_after)
 
     @update_rt
     def _fb_acq_tb_valid(self, valid, wait_after):
@@ -618,8 +618,8 @@ class Q1Core:
         self.renderer.fb_com_data(event_id, data, wait_after)
 
     @update_rt
-    def _fb_com_cfg(self, write_combine, bit_pos, length, wait_after):
-        self.renderer.fb_com_cfg(write_combine, bit_pos, length, wait_after)
+    def _fb_com_cfg(self, write_combine, shift, len, wait_after):
+        self.renderer.fb_com_cfg(write_combine, shift, len, wait_after)
 
     @update_rt
     def _fb_com_extra(self, valid, data, wait_after):
