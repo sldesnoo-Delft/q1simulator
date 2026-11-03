@@ -14,15 +14,15 @@ license = "MIT"
 license-files = [
     "LICENSE",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
 dependencies = [
     "qcodes",
-    "qblox_instruments",
-    "numpy",
+    "qblox_instruments >= 0.17",
+    "numpy >= 2.2",
     "matplotlib",
     "qtpy",
     "pyqtgraph",
