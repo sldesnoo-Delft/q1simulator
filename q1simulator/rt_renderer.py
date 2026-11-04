@@ -612,7 +612,7 @@ class Renderer:
             phase = 2*np.pi*(phase_offset + self.nco_phase_offset + self.nco_frequency * 1e-9 * t)
             nco = np.exp(1j*phase)
             # Multiplication factor as specified when modulating.
-            nco *= np.sqrt(.5)
+            path = path * np.sqrt(.5)
             if not self.real_mode_en:
                 data0 = nco.real*path[0] - nco.imag*path[1]
                 if self.mixer_phase_offset_degree != 0.0:
