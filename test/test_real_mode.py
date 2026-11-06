@@ -1,57 +1,65 @@
+"""
+Real mode: path 0 modulated by the NCO plus unmodulated path 1 on output 0.
+
+Simulator only: checks sequencer.get_output().
+"""
 import numpy as np
-import matplotlib.pyplot as plt
-from q1simulator import Cluster
 
-cluster = Cluster("Qblox", modules={2: "QCM"})
-module = cluster.module2
-
-nco_frequency = 40e6  # NCO frequency of 40 MHz
-sine_envelope_frequency = 1e6  # frequency of the sine waveform used for both path_0 and path_1
-amplitude = 0.5  # amplitude of the sine wave on path_0 (modulated by the NCO)
-
-amplitude_ratio = 0.5  # ratio of the amplitude of the sine wave on path_1 (unmodulated)
-# with respect to the amplitude of the sine wave on path_0
-
-number_of_pts = int(1e9 / sine_envelope_frequency)  # the AWG sampling rate is 1 Gs/second
+from q1_helpers import lsb
 
 
+V_MAX = 2.5  # QCM
+NCO_FREQUENCY = 40e6
+ENVELOPE_FREQUENCY = 1e6  # frequency of the sine waveform used for both path_0 and path_1
+AMPLITUDE = 0.5
+AMPLITUDE_RATIO = 0.5
+N_POINTS = int(1e9 / ENVELOPE_FREQUENCY)  # 1 GSa/s
+T_WAIT_SYNC = 4  # ns before output starts. The NCO runs from start of sequence.
 
-wf0 = np.sin(2 * np.pi * sine_envelope_frequency * np.arange(number_of_pts) * 1e-9).tolist()
+GAIN0 = int(AMPLITUDE_RATIO * AMPLITUDE * 32767)
+GAIN1 = int(AMPLITUDE * 32767)
 
-wfs = {
-    "wf0": {"data": wf0, "index": 0},
-}
-
-program0 = f"""
-wait_sync     4
-set_awg_gain  {int(amplitude_ratio * amplitude * 32767)},{int(amplitude * 32767)}
+PROGRAM = f"""
+wait_sync     {T_WAIT_SYNC}
+set_awg_gain  {GAIN0},{GAIN1}
 play:
     set_mrk   15
     play      0,0,4
     set_mrk   0
     upd_param 4
-    wait      {number_of_pts - 8}
-#jmp           @play                # loop indefinitely
+    wait      {N_POINTS - 8}
     stop
 """
 
-# assembling the program and the waveforms into a sequence dictionary object, as expected by the `qblox-instruments` API
-sequence0 = {"waveforms": wfs, "weights": {}, "acquisitions": {}, "program": program0}
 
-module.sequencer0.sync_en(True)
-module.sequencer0.mod_en_awg(True)
-module.sequencer0.nco_freq(nco_frequency)
+def test_real_mode(sim_cluster):
+    cluster = sim_cluster({2: "QCM"})
+    module = cluster.module2
+    seq = module.sequencer0
 
-module.disconnect_outputs()
-module.sequencer0.real_mode_en(True)
-module.sequencer0.sequence(sequence0)
-module.sequencer0.connect_out0("I")
+    envelope = np.sin(2 * np.pi * ENVELOPE_FREQUENCY * np.arange(N_POINTS) * 1e-9)
+    seq.sync_en(True)
+    seq.mod_en_awg(True)
+    seq.nco_freq(NCO_FREQUENCY)
+    module.disconnect_outputs()
+    seq.real_mode_en(True)
+    seq.sequence({
+        "waveforms": {"wf0": {"data": envelope.tolist(), "index": 0}},
+        "weights": {},
+        "acquisitions": {},
+        "program": PROGRAM,
+    })
+    seq.connect_out0("I")
+    module.arm_sequencer(0)
+    module.start_sequencer(0)
+    assert module.get_sequencer_status(0, 1).err_flags == []
 
-module.arm_sequencer(0)
-module.start_sequencer(0)
+    t = np.arange(N_POINTS) + T_WAIT_SYNC
+    nco = np.cos(2 * np.pi * NCO_FREQUENCY * t * 1e-9)
+    # Modulation scales both paths by 1/sqrt(2).
+    expected = V_MAX / np.sqrt(2) * (GAIN0 / 32768 * envelope * nco + GAIN1 / 32768 * envelope)
 
-module.stop_sequencer(0)
-module.sequencer0.real_mode_en(False)
-
-module.plot()
-plt.grid(True)
+    output = seq.get_output()
+    assert set(output) == {"I", "M1", "M2", "M3", "M4"}
+    # Tolerance: rounding of integer arithmetic in rendering.
+    np.testing.assert_allclose(output["I"].data, expected, rtol=0, atol=8 * lsb(V_MAX))

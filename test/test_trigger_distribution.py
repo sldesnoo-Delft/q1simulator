@@ -1,120 +1,45 @@
-import matplotlib.pyplot as pt
+"""
+Distribution of acquisition triggers between sequencers with conditional playback.
+
+QRM sequencer 0 emits trigger 1 and QRM sequencer 1 emits trigger 2.
+The QCM sequencer and both QRM sequencers play conditionally on a set of triggers.
+The trigger value is forced with the simulator configuration `acq_trigger_value`.
+
+The simulator skips the repetitions of loops to label `_start`, so 1 repetition is rendered.
+
+Simulator only: checks sequencer.get_output().
+"""
 import numpy as np
-import qcodes as qc
-from q1simulator import Cluster as SimCluster
-from qblox_instruments import Cluster
+import pytest
+
+from q1_helpers import lsb, render_path
 
 
-def generate_waveforms():
-    ''' Generates ramps '''
-    waveforms = {}
-    for i, (start, stop) in enumerate([
-            (-1.0, -0.5), (-0.5, 0.0), (0.0, 0.5), (0.5, 1.0),
-            (1.0, 0.5), (0.5, 0.0), (0.0, -0.5), (-0.5, -1.0),
-            ]):
-        waveforms[f'ramp{i}'] = {
-                'data': (0.5*np.linspace(start, stop, 60)).tolist(),
-                'index': i,
-                }
-    return waveforms
+N_REP = 20
+QCM_V_MAX = 2.5
+QRM_V_MAX = 0.5
+EMITTED_TRIGGERS = {0: 1, 1: 2}  # QRM sequencer -> trigger address
+
+RAMP_LIMITS = [
+    (-1.0, -0.5), (-0.5, 0.0), (0.0, 0.5), (0.5, 1.0),
+    (1.0, 0.5), (0.5, 0.0), (0.0, -0.5), (-0.5, -1.0),
+]
+RAMPS = [0.5 * np.linspace(start, stop, 60) for start, stop in RAMP_LIMITS]
+WAVEFORMS = {f"ramp{i}": {"data": ramp.tolist(), "index": i} for i, ramp in enumerate(RAMPS)}
+ACQUISITIONS = {"acq0": {"num_bins": 1, "index": 0}}
 
 
-class TestCluster:
-
-    def __init__(self, sim=True):
-        qc.Instrument.close_all()
-        self.sim = sim
-        if sim:
-            cluster = SimCluster('test', {1: 'QCM', 2: 'QRM'})
-            qcm = cluster.module1
-            # qcm.config('trace', True)
-            qrm = cluster.module2
-            # qrm.config('trace', True)
-            cluster.config('render_repetitions', False)
-            cluster.config('skip_wait_sync', True)
-        else:
-            cluster = Cluster('Qblox_Cluster', '192.168.0.3')
-            qcm = cluster.module2
-            qrm = cluster.module10
-
-        self.cluster = cluster
-        self.qcm = qcm
-        self.qrm = qrm
-        self.reset()
-
-    def reset(self):
-        self.cluster.reset()
-        self.armed = []
-        for module in [self.qcm, self.qrm]:
-            seq = module.sequencers[0]
-            seq.connect_out0('I')
-            seq.label = f"{module.name}-0"
-            seq = module.sequencers[1]
-            seq.connect_out1('Q')
-            seq.label = f"{module.name}-1"
-        for num in [0, 1]:
-            seq = self.qrm.sequencers[num]
-            seq.thresholded_acq_trigger_en(False)
-            seq.integration_length_acq(100)
-
-    def load(self, on_qcm, sequencer_number, program, waveforms={}, weights={}, acquisitions={}):
-        if on_qcm:
-            module = self.qcm
-        else:
-            module = self.qrm
-        seq = module.sequencers[sequencer_number]
-        seq.sequence({
-                'program': program,
-                'waveforms': waveforms,
-                'weights': weights,
-                'acquisitions': acquisitions})
-        seq.sync_en(True)
-        module.arm_sequencer(sequencer_number)
-        self.armed.append([module.slot_idx, sequencer_number])
-
-    def trigger_out(self, sequencer_number, address, threshold: float,
-                    invert: bool = False):
-        seq = self.qrm.sequencers[sequencer_number]
-        seq.thresholded_acq_trigger_en(True)
-        seq.thresholded_acq_trigger_address(address)
-        seq.thresholded_acq_threshold(threshold)
-        seq.thresholded_acq_trigger_invert(invert)
-
-    def set_trigger_thresholding(self, on_qcm, sequencer_number,
-                                 address: int, count: int = 1,
-                                 invert: bool = False):
-        if on_qcm:
-            module = self.qcm
-        else:
-            module = self.qrm
-        seq = module.sequencers[sequencer_number]
-        seq.set_trigger_thresholding(address, count, invert)
-
-    def wait_stopped(self):
-        for module in self.cluster.modules:
-            if module.present():
-                for sequencer in module.sequencers:
-                    if sequencer.sync_en():
-                        sequencer.get_sequencer_status(1.0)
-
-    def run(self):
-        self.cluster.start_sequencer()
-        self.wait_stopped()
-        if self.sim:
-            pt.figure()
-            self.qcm.plot()
-            self.qrm.plot()
-            pt.legend()
-            pt.grid(True)
-
-
-def qcm_program(used_triggers):
+def trigger_mask(used_triggers):
     mask = 0
     for addr in used_triggers:
         mask |= 1 << (addr - 1)
+    return mask
 
-    return f'''
-    move {n_rep},R1
+
+def qcm_program(used_triggers):
+    mask = trigger_mask(used_triggers)
+    return f"""
+    move {N_REP},R1
     wait_sync 100
     _start:
       set_latch_en 1, 100
@@ -131,7 +56,7 @@ def qcm_program(used_triggers):
       play 1,1,92 # subtract 8 ns for next conditional
       # duration of else: 8 ns
 
-      # set_cond enable, 0b0001, NOR, else_wait
+      # set_cond enable, mask, NOR, else_wait
       set_cond 1, {mask}, 1, 4
       play 6,6,80
       wait 20
@@ -142,16 +67,13 @@ def qcm_program(used_triggers):
       latch_rst 4
     loop R1,@_start
     stop
-    '''
+    """
 
 
 def qrm_program(used_triggers):
-    mask = 0
-    for addr in used_triggers:
-        mask |= 1 << (addr - 1)
-
-    return f'''
-    move {n_rep},R1
+    mask = trigger_mask(used_triggers)
+    return f"""
+    move {N_REP},R1
     wait_sync 100
     _start:
       set_latch_en 1, 4
@@ -167,7 +89,7 @@ def qrm_program(used_triggers):
       play 1,1,92 # subtract 8 ns for next conditional
       # duration of else: 8 ns
 
-      # set_cond enable, 0b0001, NOR, else_wait
+      # set_cond enable, mask, NOR, else_wait
       set_cond 1, {mask}, 1, 4
       play 6,6,80
       wait 20
@@ -178,109 +100,70 @@ def qrm_program(used_triggers):
       latch_rst 4
     loop R1,@_start
     stop
-    '''
+    """
 
 
-sim = TestCluster(sim=True)
-waveforms = generate_waveforms()
-acquisitions = {
-        "acq0": {"num_bins": 1, "index": 0},
-        }
-
-n_rep = 20
-
-
-# %%
-
-# qcm0: uses [1,2], qrm0: emits 1, qrm1 emits 2,
-
-sim.reset()
-sim.load(True, 0, qcm_program([1, 2]), waveforms=waveforms)
-sim.load(False, 0, qrm_program([]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(0, 1, 0.0)
-sim.load(False, 1, qrm_program([]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(1, 2, 0.0)
-sim.cluster.config('acq_trigger_value', 0)
-sim.run()
-sim.cluster.config('acq_trigger_value', 1)
-sim.run()
-
-# %%
-
-# qcm0: uses 1, qrm1: emits 1 uses 2, qrm2 emits 2
-
-sim.reset()
-sim.load(True, 0, qcm_program([1]), waveforms=waveforms)
-sim.load(False, 0, qrm_program([2]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(0, 1, 0.0)
-sim.load(False, 1, qrm_program([]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(1, 2, 0.0)
-sim.cluster.config('acq_trigger_value', 0)
-sim.run()
-sim.cluster.config('acq_trigger_value', 1)
-sim.run()
-
-# %%
-
-# qcm0: uses 1, qrm1: emits 1 uses 2, qrm2 emits 2, uses 2
-
-sim.reset()
-sim.load(True, 0, qcm_program([1]), waveforms=waveforms)
-sim.load(False, 0, qrm_program([2]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(0, 1, 0.0)
-sim.load(False, 1, qrm_program([2]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(1, 2, 0.0)
-sim.cluster.config('acq_trigger_value', 0)
-sim.run()
-sim.cluster.config('acq_trigger_value', 1)
-sim.run()
-
-# %%
-
-# qcm0: uses 2 qrm1: emits 1 uses 1, 2, qrm2 emits 2, uses 2
-
-sim.reset()
-sim.load(True, 0, qcm_program([2]), waveforms=waveforms)
-sim.load(False, 0, qrm_program([1, 2]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(0, 1, 0.0)
-sim.load(False, 1, qrm_program([2]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(1, 2, 0.0)
-sim.cluster.config('acq_trigger_value', 0)
-sim.run()
-sim.cluster.config('acq_trigger_value', 1)
-sim.run()
-
-# %%
-
-# Dependencies on not configured triggers
-
-sim.reset()
-sim.load(True, 0, qcm_program([1, 2, 3]), waveforms=waveforms)
-sim.load(False, 0, qrm_program([1, 2]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(0, 1, 0.0)
-sim.load(False, 1, qrm_program([2, 9]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(1, 2, 0.0)
-sim.cluster.config('acq_trigger_value', 0)
-sim.run()
-sim.cluster.config('acq_trigger_value', 1)
-sim.run()
+# (triggers used by QCM sequencer 0, by QRM sequencer 0, by QRM sequencer 1)
+SCENARIOS = [
+    ([1, 2], [], []),
+    ([1], [2], []),
+    ([1], [2], [2]),
+    ([2], [1, 2], [2]),
+    # Dependencies on triggers that are not emitted.
+    ([1, 2, 3], [1, 2], [2, 9]),
+    # QRM sequencers depend on each other's trigger.
+    ([], [2], [1, 2]),
+]
 
 
-# %%
+def scenario_id(scenario):
+    return "-".join(f"{name}{''.join(map(str, used)) or 'none'}"
+                    for name, used in zip(["qcm", "qrm0_", "qrm1_"], scenario))
 
-# qcm0: uses 1,2 qrm1: uses 1, 2, qrm2 uses 2
 
-# !!! SORTING FAILS !!!
-sim.reset()
-sim.load(True, 0, qcm_program([]), waveforms=waveforms)
-sim.load(False, 0, qrm_program([2]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(0, 1, 0.0)
-sim.load(False, 1, qrm_program([1, 2]), acquisitions=acquisitions, waveforms=waveforms)
-sim.trigger_out(1, 2, 0.0)
-try:
-    sim.run()
-except Exception as ex:
-    if ex.args[0].startswith("Sorting sequencers on triggers failed."):
-        print("Test OK.")
-    else:
-        raise
+def expected_output(condition: bool) -> np.ndarray:
+    """Output of 1 repetition: ramp1 if condition is true, else ramp6."""
+    conditional = RAMPS[1] if condition else RAMPS[6]
+    return render_path(600, [(100, RAMPS[0], 1.0), (200, RAMPS[3], 1.0),
+                             (400, conditional, 1.0), (500, RAMPS[3], 1.0)])
+
+
+@pytest.mark.parametrize("trigger_value", [0, 1])
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=[scenario_id(s) for s in SCENARIOS])
+def test_trigger_distribution(sim_cluster, scenario, trigger_value):
+    qcm_used, qrm0_used, qrm1_used = scenario
+    cluster = sim_cluster({1: "QCM", 2: "QRM"})
+    qcm, qrm = cluster.module1, cluster.module2
+
+    # (sequencer, used triggers, output path, v_max)
+    sequencers = [(qcm.sequencers[0], qcm_used, "I", QCM_V_MAX)]
+    qcm.sequencers[0].connect_out0("I")
+    qcm.sequencers[0].sequence({"program": qcm_program(qcm_used), "waveforms": WAVEFORMS,
+                                "weights": {}, "acquisitions": {}})
+    for seq_nr, used in [(0, qrm0_used), (1, qrm1_used)]:
+        seq = qrm.sequencers[seq_nr]
+        path = "IQ"[seq_nr]
+        seq.parameters[f"connect_out{seq_nr}"].set(path)
+        seq.integration_length_acq(100)
+        seq.thresholded_acq_trigger_en(True)
+        seq.thresholded_acq_trigger_address(EMITTED_TRIGGERS[seq_nr])
+        seq.thresholded_acq_threshold(0.0)
+        seq.thresholded_acq_trigger_invert(False)
+        seq.sequence({"program": qrm_program(used), "waveforms": WAVEFORMS,
+                      "weights": {}, "acquisitions": ACQUISITIONS})
+        sequencers.append((seq, used, path, QRM_V_MAX))
+
+    for seq, *_ in sequencers:
+        seq.sync_en(True)
+        seq.arm_sequencer()
+    cluster.config("acq_trigger_value", trigger_value)
+    cluster.start_sequencer()
+
+    emitted = set(EMITTED_TRIGGERS.values()) if trigger_value else set()
+    for seq, used, path, v_max in sequencers:
+        assert seq.get_sequencer_status(timeout=1).err_flags == [], seq.name
+        # Triggers of acquisition at 4 ns arrive at 354 ns, before set_cond at 392 ns.
+        condition = bool(set(used) & emitted)
+        np.testing.assert_allclose(
+            seq.get_output()[path].data, v_max * expected_output(condition),
+            rtol=0, atol=3 * lsb(v_max), err_msg=f"{seq.name}: condition {condition}")
