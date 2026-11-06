@@ -16,6 +16,7 @@ class Instruction:
     func_name: str | None = None
     func: Any = None
     clock_ticks: int = 1
+    is_simulator_instruction: bool = False
 
 
 class AsmSyntaxError(Exception):
@@ -152,11 +153,11 @@ mnemonic_args_v2 = {
 
     # FEEDBACK Instructions:
     "fb_acq_tb_id": "u,u",
-    "fb_acq_tb_cfg": "u,u,u,u,u",
+    "fb_acq_tb_cfg": "u,u,u,u",
     "fb_acq_iq_id": "u,u",
-    "fb_acq_tb_valid": "n,u",
+    "fb_acq_tb_valid": "b,u",
     "fb_acq_tb_extra": "b,u,u",
-    "fb_acq_tb_mock_en": "b,b,b,u",
+    "fb_acq_tb_mock": "b,b,b,u",
     "fb_acq_iq_shift": "u,u",
     "fb_com_data": "u,U,u",
     "fb_com_cfg": "u,u,u,u",
@@ -189,21 +190,31 @@ class Q1Parser:
 
         deprecated_instructions = set()
         instructions = []
-        for i, line in enumerate(lines):
-            label, mnemonic, arglist = self._parseline(line)
-            if label:
+        for line_num, line in enumerate(lines):
+            try:
+                instruction = self._parseline(line, line_num)
+            except AsmSyntaxError as ex:
+                print(ex)
+                print(line)
+                ex.args = ex.args + (f"line {line_num}: {line}", )
+                raise
+
+            if not instruction:
+                continue
+            if instruction.label:
                 icnt = len(instructions)
-                labels[label] = icnt
+                labels[instruction.label] = icnt
+            mnemonic = instruction.mnemonic
             if not mnemonic:
                 continue
 
             if self.v2:
                 if (mnemonic in ["jlt", "loop", "acquire_weighed"]
-                        or (mnemonic == "jge" and len(arglist) == 3)):
+                        or (mnemonic == "jge" and len(instruction.arglist) == 3)):
                     deprecated_instructions.add(mnemonic)
-                    mnemonic = "depr_" + mnemonic
+                    instruction.mnemonic = "depr_" + mnemonic
 
-            instructions.append(Instruction(i, mnemonic, arglist, label))
+            instructions.append(instruction)
 
         if deprecated_instructions:
             print(f"Warning: Q1ASM contains deprecated instructions {deprecated_instructions}")
@@ -216,38 +227,38 @@ class Q1Parser:
             mnemonic = instr.mnemonic
             func_name = "_" + mnemonic
             instr.func_name = func_name
-            if mnemonic in mnemonic_args:
-                try:
-                    args, reg_args = self._evaluate_args(mnemonic_args[mnemonic], instr.arglist)
-                    instr.args = args
-                    instr.reg_args = reg_args
-                    if reg_args:
-                        # 1 cycle for every register. instr and 1st register are loaded in 1 cycle
-                        instr.clock_ticks = len(reg_args)
-                    else:
-                        # 1 cycle to load instruction
-                        instr.clock_ticks = 1
-                except AsmSyntaxError as ex:
-                    print(ex)
-                    print(lines[instr.text_line_nr])
-                    ex.args = ex.args + (f"line {instr.text_line_nr}: {lines[instr.text_line_nr]}", )
-                    raise
-                except Exception as ex:
-                    print(ex)
-                    print(lines[instr.text_line_nr])
-                    ex.args = ex.args + (f"line {instr.text_line_nr}: {lines[instr.text_line_nr]}", )
-                    raise
-            else:
-                instr.args = instr.arglist
+            if instr.is_simulator_instruction:
+                continue
+            try:
+                if mnemonic not in mnemonic_args:
+                    raise AsmSyntaxError(f"Unknown instruction {mnemonic}")
+                args, reg_args = self._evaluate_args(mnemonic_args[mnemonic], instr.arglist)
+                instr.args = args
+                instr.reg_args = reg_args
+                if reg_args:
+                    # 1 cycle for every register. instr and 1st register are loaded in 1 cycle
+                    instr.clock_ticks = len(reg_args)
+                else:
+                    # 1 cycle to load instruction
+                    instr.clock_ticks = 1
+            except AsmSyntaxError as ex:
+                print(ex)
+                print(lines[instr.text_line_nr])
+                ex.args = ex.args + (f"line {instr.text_line_nr}: {lines[instr.text_line_nr]}", )
+                raise
+            except Exception as ex:
+                print(ex)
+                print(lines[instr.text_line_nr])
+                ex.args = ex.args + (f"line {instr.text_line_nr}: {lines[instr.text_line_nr]}", )
+                raise
 
         return lines, instructions
 
-    def _parseline(self, line):
-        org_line = line
+    def _parseline(self, line, line_num) -> Instruction | None:
         label_pattern = r"(\w+:)"
         instr_pattern = r"(\w+:)?\s*(\w+)\s*(.*)"
         if line.startswith("#Q1Sim:"):
-            return self._parse_simcmd(line[7:])
+            return self._parse_simcmd(line[7:], line_num)
         try:
             end = line.index("#")
             line = line[:end]
@@ -255,13 +266,13 @@ class Q1Parser:
             pass
         line = line.strip()
         if len(line) == 0:
-            return [None, None, None]
+            return None
 
         match = re.fullmatch(label_pattern, line)
         if match:
             label = match.group(1)
             label = label[:-1]
-            return [label, None, None]
+            return Instruction(line_num, None, label=label)
 
         match = re.fullmatch(instr_pattern, line)
         if match:
@@ -273,10 +284,11 @@ class Q1Parser:
                 arglist = args.replace(" ", "").split(",")
             else:
                 arglist = []
-            return [label, match.group(2), arglist]
-        raise Exception(f"{self.name}: Parse error on line: {org_line}")
+            mnemonic = match.group(2)
+            return Instruction(line_num, mnemonic, arglist, label=label)
+        raise AsmSyntaxError(f"Line cannot be parsed")
 
-    def _parse_simcmd(self, command):
+    def _parse_simcmd(self, command, line_num) -> Instruction:
         command = command.strip()
         # format: log "msg",register,options
         log_pattern = r'log "(.*)",(\w+)?,(\w+)?'
@@ -287,15 +299,22 @@ class Q1Parser:
             options = match.group(3)
             if msg is None:
                 msg = ""
-            return None, "log", (msg, register, options)
+            arglist = (msg, register, options)
+            return Instruction(line_num, "log", arglist, 
+                               is_simulator_instruction=True,
+                               args=arglist,
+                               clock_ticks=0)
         trigger_pattern = r"sim_trigger (\d),\s*([01])"
         match = re.fullmatch(trigger_pattern, command)
         if match:
             addr = match.group(1)
             value = match.group(2)
-            return None, "sim_trigger", (addr, value)
-        print(f"Unknown simulator command:{command}")
-        return None, None, None
+            arglist = (addr, value)
+            return Instruction(line_num, "sim_trigger", arglist, 
+                               is_simulator_instruction=True,
+                               args=arglist,
+                               clock_ticks=0)
+        raise AsmSyntaxError(f"Unknown simulator command:{command}")
 
     def _evaluate_args(self, arg_types, args):
         types = arg_types.split(",") if arg_types else []

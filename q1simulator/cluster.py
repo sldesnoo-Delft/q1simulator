@@ -3,7 +3,8 @@ from collections.abc import Iterable
 from functools import partial
 
 import matplotlib.pyplot as pt
-import qcodes as qc
+from qcodes.instrument import Instrument, InstrumentChannel
+from qcodes.parameters import ManualParameter
 
 from qblox_instruments import (
         InstrumentClass, InstrumentType,
@@ -20,7 +21,7 @@ from .scheduler import Scheduler
 logger = logging.getLogger(__name__)
 
 
-class ClusterModule(qc.InstrumentChannel, Q1Module):
+class ClusterModule(InstrumentChannel, Q1Module):
     def __init__(self, root_instrument, name: str, slot: int, scheduler: Scheduler, *,
                  n_sequencers: int = 6,
                  sim_type: SupportedSimulatorTypes,
@@ -34,16 +35,16 @@ class ClusterModule(qc.InstrumentChannel, Q1Module):
         return self._slot
 
 
-class EmptySlot(qc.InstrumentChannel):
+class EmptySlot(InstrumentChannel):
     def __init__(self, root_instrument, name):
         super().__init__(root_instrument, name)
 
         # Add module QCoDeS parameters
-        self.add_parameter("present", qc.ManualParameter, initial_value=False)
-        self.add_parameter("connected", qc.ManualParameter, initial_value=False)
+        self.add_parameter("present", ManualParameter, initial_value=False)
+        self.add_parameter("connected", ManualParameter, initial_value=False)
 
 
-class Cluster(qc.Instrument):
+class Cluster(Instrument):
     _log_only_params = [
         'led_brightness',
         'reference_source',
@@ -57,9 +58,9 @@ class Cluster(qc.Instrument):
         if modules is None:
             modules = {}
         check_qblox_instrument_version()
-        if qc.Instrument.exist(name):
+        if Instrument.exist(name):
             logger.info(f"Closing old simulator with same name ({name})")
-            old = qc.Instrument.find_instrument(name)
+            old = Instrument.find_instrument(name)
             if not str(old.__class__) == str(Cluster):
                 raise Exception(f"Oops, existing instrument '{name}' is not a cluster")
             old.close()
@@ -190,7 +191,7 @@ class Cluster(qc.Instrument):
         return self._modules[slot].get_acquisitions(sequencer, as_numpy=as_numpy)
 
     def delete_acquisition_data(self, slot: int, sequencer: int, name: str = '', all=False):
-        return self._modules[slot].delete_acquisition_data(slot, name=name, all=all)
+        return self._modules[slot].delete_acquisition_data(sequencer, name=name, all=all)
 
     def connect_sequencer(self, slot: int, sequencer: int, *connections: str) -> None:
         self._modules[slot].connect_sequencer(sequencer, *connections)
@@ -223,7 +224,7 @@ class Cluster(qc.Instrument):
     def set_broad_cast(self,
                        id_: int | list[int],
                        ) -> None:
-        modules = [module for module in self.modules.values() if module.present()]
+        modules = [module for module in self.modules if module.present()]
         self.set_cmm_route(id_, modules)
 
     def _log_set(self, name, value):
@@ -258,7 +259,7 @@ class Cluster(qc.Instrument):
             create_figure:
                 If True create a new figure.
                 If False only pyplot.plot() is called without creating figure or setting axis labels.
-                If "modules" creates a new figure per module.
+                If "module" creates a new figure per module.
             analogue_filter: plot result after applying (estimated) analog filter.
             analogue_output_frequency: sample rate of analogue output
             output_per_sequencer:

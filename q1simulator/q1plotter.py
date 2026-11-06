@@ -1,7 +1,7 @@
 import logging
 import os
 
-from qcodes import Instrument
+from qcodes.instrument import Instrument
 from qblox_instruments import Cluster
 from .cluster import Cluster as SimCluster
 

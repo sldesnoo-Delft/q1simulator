@@ -21,25 +21,35 @@ logger = logging.getLogger(__name__)
 MockDataEntry = float | complex | Sequence[float]
 
 
-def clip_np16_sum(a: np.int16, b: np.int16) -> np.int16:
-    """Clip sum of two int16 on overflow instead of default wrapping ."""
-    return np.int16(
-        (np.int16(a) + np.int32(b)).clip(-32768, 32767)
-    )
+def clip_sum(a: NDArray, b: NDArray) -> NDArray:
+    """Clip sum to int16 on overflow instead of default wrapping ."""
+    return (a + b).clip(-32768, 32767).astype(np.int16)
 
-def clip_np_16_product(a: np.int16, b: np.int16) -> np.int16:
-    """Clip product of two int16 on overflow instead of default wrapping ."""
-    return np.int16(
-        (np.int16(a) * np.int32(b)).clip(-32768, 32767)
-    )
+
+def clip_product(a: NDArray, b: NDArray) -> NDArray:
+    """Clip product to int16 on overflow instead of default wrapping ."""
+    return ((a * b) >> 15).clip(-32768, 32767).astype(np.int16)
+
+
+class RealTimeError(Exception):
+    """Raised when the RT core cannot execute an instruction"""
+
+
+@dataclass
+class QcodesSettings:
+    awg_offs: np.ndarray = field(default_factory=lambda: np.zeros(2, int))
+    awg_gain: np.ndarray = field(default_factory=lambda: np.full(2, 32767, int))
+    relative_phase: float | None = None
+    phase_shift: float = 0
+    frequency: float | None = None
+
 
 @dataclass
 class Settings:
     marker: int = 0
-    awg_offs_qcodes: np.ndarray = field(default_factory=lambda: np.zeros(2, np.int16))
-    awg_offs: np.ndarray = field(default_factory=lambda: np.zeros(2, np.int16))
-    awg_gain: np.ndarray = field(default_factory=lambda: np.full(2, 32767, np.int16))
-    awg_gain_qcodes: np.ndarray = field(default_factory=lambda: np.full(2, 1.0, np.int16))
+    # Note gain and offs: use int to avoid casting to int32 in the operations
+    awg_offs: np.ndarray = field(default_factory=lambda: np.zeros(2, int))
+    awg_gain: np.ndarray = field(default_factory=lambda: np.full(2, 32767, int))
     reset_phase: bool = False
     relative_phase: float | None = None
     phase_shift: float = 0
@@ -116,10 +126,6 @@ def float2int16array(value):
     return np.array(value*2**15).astype(np.int32)
 
 
-def _i16(value):
-    return np.int32(value).astype(np.int16)
-
-
 def check_conditional(clear_latched_settings=False):
     def _check_conditional(func):
         @wraps(func)
@@ -157,10 +163,10 @@ class Renderer:
         self.mixer_gain_ratio = 1.0
         self.mixer_phase_offset_degree = 0.0
         self.delete_acquisition_data_all()
-        self.next_settings = Settings()
         self.enabled_paths: list[bool] = [False, False]
         self.trace_enabled: bool = False
         self._skip_wait_sync: bool = True
+        self.qcodes_settings = QcodesSettings()
         self.reset()
         self.acq_trigger_value: bool | None = None
         self.forced_condition_value: int | None = None
@@ -169,15 +175,19 @@ class Renderer:
         self.acq_conf = AcqConf()
 
     def reset(self):
-        # start with the old settings / values set via qcodes.
-        self.settings = deepcopy(self.next_settings)
+        self.next_settings = Settings()
+        self.settings = Settings()
         self.time = 0
         self.no_render_till_sync = self._skip_wait_sync
         self.t_sync = 0
+        self.nco_frequency = self.qcodes_settings.frequency or 0.0
         # Qblox sequencer has 3 different phase registers
         self.nco_phase_offset = 0.0
         self.relative_phase = 0.0
         self.delta_phase = 0.0
+        # combined q1asm and qcodes. 
+        self.awg_offs = self.qcodes_settings.awg_offs.copy()
+        self.awg_gain = self.qcodes_settings.awg_gain.copy()
         self.wave_start = 0
         self.waves_end = (0, 0)
         self.waves = (None, None)
@@ -213,10 +223,13 @@ class Renderer:
         self.t_sync = 0
 
     def gain_awg_path(self, gain, path):
-        self.next_settings.awg_gain[path] = gain
+        self.qcodes_settings.awg_gain[path] = gain
 
     def offset_awg_path(self, offset, path):
-        self.next_settings.awg_offs_qcodes[path] = offset
+        self.qcodes_settings.awg_offs[path] = offset
+
+    def set_nco_frequency(self, value):
+        self.qcodes_settings.frequency = value
 
     def enable_paths(self, enabled_paths):
         self.enabled_paths = enabled_paths
@@ -302,10 +315,7 @@ class Renderer:
         self.next_settings.awg_gain[:] = gain0, gain1
 
     def set_awg_offs(self, offset0, offset1):
-        self.next_settings.awg_offs[:] = (
-            offset0,
-            offset1
-        )
+        self.next_settings.awg_offs[:] = offset0, offset1
 
     @check_conditional(clear_latched_settings=True)
     def upd_param(self, wait_after):
@@ -360,13 +370,17 @@ class Renderer:
             self._trace(f'Acquire TTL {acq_index} {bin_index} {enable}')
         if enable:
             if self.acq_ttl_start is not None:
-                self._error("ACQ TTL already enabled")
+                logger.error(f"{self.name}: ACQ TTL already enabled")
+                self._error("SEQUENCE PROCESSOR RT EXEC ILLEGAL INSTRUCTION")
+                return
             self.acq_ttl_start = self.time
             self.acq_ttl_acq_index = acq_index
             self.act_ttl_bin_index = bin_index
         else:
             if self.acq_ttl_start is None:
-                self._error("ACQ TTL not enabled")
+                logger.error(f"{self.name}: ACQ TTL not enabled")
+                self._error("SEQUENCE PROCESSOR RT EXEC ILLEGAL INSTRUCTION")
+                return
             # FIXME: use mock data. Generate events when time is incremented in _reader.
             # Use arguments from enable
             self._add_acquisition_ttl(
@@ -387,7 +401,7 @@ class Renderer:
         new_time = self._event_distributor.wait_sync_sequencer(self.name, self.time)
         self._trace(f"-- wait_sync waited: {new_time - self.time} + {wait_after}")
         sync_time = new_time - self.time
-        self._render(sync_time + wait_after)
+        self._render(wait_after, extra_time=sync_time)
         self.no_render_till_sync = False
         self.t_sync = self.time
 
@@ -498,9 +512,11 @@ class Renderer:
     def max_render_time(self, value):
         self._max_render_time = int(value)
 
-    def _error(self, msg):
+    def _error(self, msg, stop: bool = True):
         logger.error(f'{self.name}: {msg}')
         self.errors.add(msg)
+        if stop:
+            raise RealTimeError(msg)
 
     def _update_settings(self):
         new = self.next_settings
@@ -542,10 +558,15 @@ class Renderer:
         new.phase_shift = 0.0
         if new.marker != old.marker:
             self._render_marker(old.marker, new.marker)
+        if np.any(new.awg_offs != old.awg_offs):
+            self.awg_offs = clip_sum(new.awg_offs, self.qcodes_settings.awg_offs)
+        if np.any(new.awg_gain != old.awg_gain):
+            self.awg_gain = clip_product(new.awg_gain, self.qcodes_settings.awg_gain)
+
         # copy marker, offset and gain
         self.settings = deepcopy(self.next_settings)
 
-    def _clear_latched_settings(self):
+    def _clear_latched_settings(self): # ???
         pending = self.next_settings
         pending.reset_phase = False
         pending.phase_shift = 0.0
@@ -569,13 +590,16 @@ class Renderer:
                     # add final marker step
                     marker_out += [[t_max, m_old], [t_max, 0]]
 
-    def _render(self, time):
-        if time < 4:
-            logger.error(f'{self.name}: wait_time ({time} ns) must be >= 4 ns')
-            self._error('WAIT TIME < 4 ns')
-        if time > 65535:
-            logger.error(f'{self.name}: wait_time ({time} ns) must be < 65535 ns')
-            self._error('WAIT TIME > 65535 ns')
+    def _render(self, wait_time: int, extra_time: int = 0):
+        if wait_time < 4:
+            logger.error(f'{self.name}: wait_time ({wait_time} ns) must be >= 4 ns')
+            self._error('SEQUENCE PROCESSOR RT EXEC ILLEGAL INSTRUCTION')
+        if wait_time > 65535:
+            logger.error(f'{self.name}: wait_time ({wait_time} ns) must be < 65535 ns')
+            self._error('SEQUENCE PROCESSOR RT EXEC ILLEGAL INSTRUCTION')
+
+        # extra time is added by sequencer synchronization.
+        time = wait_time + extra_time
 
         t_start = self.time
         t_end = t_start + int(time)
@@ -592,19 +616,15 @@ class Renderer:
 
         t_render = t_end - t_start
 
-        s = self.settings
-
         path = np.zeros((2, t_render), dtype=np.int16)
-        path[0] = clip_np16_sum(s.awg_offs_qcodes[0], s.awg_offs[0])
-        path[1] = clip_np16_sum(s.awg_offs_qcodes[1], s.awg_offs[1])
+        path[:] = self.awg_offs[:, None]
 
-        # TODO only render if path active!
         for i in range(2):
-            combined_gain = clip_np_16_product(s.awg_gain[i], s.awg_gain_qcodes[i])
             if self.waves_end[i] > t_start:
                 end = min(self.waves_end[i], t_end)
                 data = self.waves[i][t_start-self.wave_start:end-self.wave_start]
-                path[i][0:len(data)] += (combined_gain * data) >> 15
+                n = len(data)
+                path[i][:n] = clip_sum(path[i][:n], (self.awg_gain[i] * data) >> 15)
 
         if self.mod_en_awg:
             t = np.arange(t_start, t_end)
@@ -612,7 +632,8 @@ class Renderer:
             phase = 2*np.pi*(phase_offset + self.nco_phase_offset + self.nco_frequency * 1e-9 * t)
             nco = np.exp(1j*phase)
             # Multiplication factor as specified when modulating.
-            nco *= np.sqrt(.5)
+            # Note: also in real mode applied to both paths.
+            path = (path * np.sqrt(.5)).astype(int)
             if not self.real_mode_en:
                 data0 = nco.real*path[0] - nco.imag*path[1]
                 if self.mixer_phase_offset_degree != 0.0:
@@ -719,8 +740,8 @@ class Renderer:
                     return (value[0], value[1])
                 raise ValueError(f"Incompatible mock data {value}")
             except StopIteration:
-                self._error('OUT OF MOCK DATA')
-                return (np.nan, np.nan)
+                logger.error(f'{self.name}: OUT OF MOCK DATA')
+                return (0, 0)
 
     def delete_acquisition_data_all(self):
         self.acq_count = {}
@@ -745,11 +766,11 @@ class Renderer:
             return
         self.acq_times[acq_index].append((t - self.t_sync, bin_index))
         self.acq_integrations.append(AcqIntegration(t-self.t_sync, t_end-self.t_sync, weight0, weight1))
-        if bin_index >= self.acquisitions[acq_index]:
+        bin_size = self.acquisitions[acq_index]
+        if bin_index >= bin_size:
             self._error('ACQ BIN INDEX INVALID')
-            return
         if not self.acq_buffer.add(t):
-            self._error('ACQ BINNING FIFO ERROR')
+            self._error('ACQ BINNING FIFO ERROR', stop=False)
             return
         acq_conf = self.acq_conf
         value = self._get_acq_data(acq_index, t/1e6)
@@ -799,22 +820,23 @@ class Renderer:
     def _add_acquisition_ttl(self, acq_index, bin_index, start, stop):
         if acq_index not in self.acquisitions:
             self._error('ACQ INDEX INVALID')
-            return
         self.acq_times[acq_index].append((start - self.t_sync, bin_index))
         self.acq_integrations.append(AcqIntegration(start-self.t_sync, stop-self.t_sync))
-        if bin_index >= self.acquisitions[acq_index]:
+        bin_size = self.acquisitions[acq_index]
+        if bin_index >= bin_size:
             self._error('ACQ BIN INDEX INVALID')
             return
         # FIXME: This is not correct. Every ttl trigger should be accounted.
         if not self.acq_buffer.add(start):
-            self._error('ACQ BINNING FIFO ERROR')
+            self._error('ACQ BINNING FIFO ERROR', stop=False)
             return
         # TODO: add mock data
         # Just add 5 counts for every ttl acquisition
         n = 5
         bin_offset = 0
         for i in range(n):
-            self.acq_count[acq_index][bin_index+bin_offset] += 1
+            if bin_index + bin_offset < bin_size:
+                self.acq_count[acq_index][bin_index+bin_offset] += 1
             # TODO set acq_data.
             if self.ttl_acq_auto_bin_incr_en:
                 bin_offset += 1

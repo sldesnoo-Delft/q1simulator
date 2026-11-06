@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.4.0] - 2026-11-02
+
+- Update to qblox-instruments v1.4.1
+- Fix 1/sqrt(2) for real sequencer mode.
+- Fixed bugs in error handling and aborting sequencers
+- Fixed small bugs in API
+- Fixed QCoDeS deprecation warnings
+
 ## \[1.3.5] - 2026-11-02
 
 - Fix performance issue.

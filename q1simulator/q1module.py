@@ -4,7 +4,8 @@ from functools import partial
 
 import numpy as np
 import matplotlib.pyplot as pt
-import qcodes as qc
+from qcodes.parameters import ManualParameter
+from qcodes.instrument import InstrumentBase
 from numpy.typing import NDArray
 
 from .channel_data import MarkerOutput, SampledOutput
@@ -17,7 +18,7 @@ from qblox_instruments import InstrumentType
 logger = logging.getLogger(__name__)
 
 
-class Q1Module(qc.instrument.InstrumentBase):
+class Q1Module(InstrumentBase):
     _module_parameters = [
         'ext_trigger_input_delay',
         'ext_trigger_input_trigger_en',
@@ -169,8 +170,8 @@ class Q1Module(qc.instrument.InstrumentBase):
             sim_params += [f'marker{ch}_exp{i}_config' for i in range(4)]
 
         # Add module QCoDeS parameters
-        self.add_parameter("present", qc.ManualParameter, initial_value=True)
-        self.add_parameter("connected", qc.ManualParameter, initial_value=True)
+        self.add_parameter("present", ManualParameter, initial_value=True)
+        self.add_parameter("connected", ManualParameter, initial_value=True)
 
         for par_name in sim_params:
             self.add_parameter(par_name, set_cmd=partial(self._set, par_name))
@@ -306,7 +307,7 @@ class Q1Module(qc.instrument.InstrumentBase):
             sequencers: Iterable[Q1Sequencer] | None = None,
             ) -> None:
         ids = id_ if isinstance(id_, Iterable) else (id_,)
-        sequencers = sequencers | self.sequencers
+        sequencers = sequencers or self.sequencers
         for seq in sequencers:
             for event_id in ids:
                 self._scheduler.event_distributor.set_route(event_id, seq.name)

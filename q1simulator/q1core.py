@@ -6,7 +6,7 @@ import numpy as np
 
 from .q1parser import Q1Parser
 from .event_distributor import EventDistributor
-from .rt_renderer import Renderer, FeedbackQueueEntry
+from .rt_renderer import Renderer, FeedbackQueueEntry, RealTimeError
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,6 @@ class Q1Core:
         else:
             self._jge = self._jge_v1
             self._jlt = self._jlt_v1
-            self._jge = self._jge_v1
             self._loop = self._loop_v1
             self._asr = self._lsr  # it does not extend the sign.
             self._acquire_weighed = self._acquire_weighted
@@ -76,8 +75,8 @@ class Q1Core:
         parser = Q1Parser(self.v2)
         self.lines, self.instructions = parser.parse(program)
         max_instructions = Q1Core.max_instructions_qrm if self._is_qrm else Q1Core.max_instructions_qcm
-        if len(self.lines) > max_instructions:
-            raise Exception(f"Program too big for instruction memory. {len(self.lines)} > {max_instructions}.")
+        if len(self.instructions) > max_instructions:
+            raise Exception(f"Program too big for instruction memory. {len(self.instructions)} > {max_instructions}.")
 
     def get_used_triggers(self) -> int:
         '''
@@ -110,23 +109,23 @@ class Q1Core:
         # give the core a head start of 10 cycles
         self.clock.add_ticks(-10)
 
-        if len(self.instructions) == 0:
-            print('*** No instructions loaded')
-            self._error('SEQUENCE PROCESSOR Q1 ILLEGAL INSTRUCTION')
-            return
-
-        for instr in self.instructions:
-            try:
-                instr.func = getattr(self, instr.func_name)
-            except AttributeError as ex:
-                msg = f'Illegal instruction at line {instr.text_line_nr}: {ex}'
-                self._print_error_msg(msg, instr, 0)
-                self._error('SEQUENCE PROCESSOR Q1 ILLEGAL INSTRUCTION')
-                return
-
         start = time.perf_counter()
         orig_err_settings = np.seterr(over='ignore')
         try:
+            if len(self.instructions) == 0:
+                print('*** No instructions loaded')
+                self._error('SEQUENCE PROCESSOR Q1 ILLEGAL INSTRUCTION')
+                return
+
+            for instr in self.instructions:
+                try:
+                    instr.func = getattr(self, instr.func_name)
+                except AttributeError as ex:
+                    msg = f'Illegal instruction at line {instr.text_line_nr}: {ex}'
+                    self._print_error_msg(msg, instr, 0)
+                    self._error('SEQUENCE PROCESSOR Q1 ILLEGAL INSTRUCTION')
+                    return
+
             cntr = 0
             while True:
                 cntr += 1
@@ -141,8 +140,9 @@ class Q1Core:
                         args[i] = self.R[reg_num]
                 else:
                     args = instr.args
-                self.updating_reg = None
-                self.clock.add_ticks(instr.clock_ticks)
+                if not instr.is_simulator_instruction:
+                    self.updating_reg = None
+                    self.clock.add_ticks(instr.clock_ticks)
                 instr.func(*args)
                 if self.iptr >= len(self.instructions):
                     raise Illegal(f'No instruction at {self.iptr:04}')
@@ -155,6 +155,10 @@ class Q1Core:
             rt_time_us = self.renderer.time / 1000
             self.exit_code = ex.exit_code
             logger.info(f'{self.name}: stopped ({cntr} cycles, {rt_time_us:7.3f} us), exit_code: {self.exit_code}')
+        except RealTimeError as ex:
+            msg = f'Real time error at line {self.iptr}: {ex}'
+            self._print_error_msg(msg, instr, cntr)
+            # Note error is already set for status.
         except Illegal as ex:
             msg = f'Illegal instruction at line {self.iptr}: {ex}'
             self._print_error_msg(msg, instr, cntr)
@@ -169,6 +173,7 @@ class Q1Core:
             raise
         finally:
             np.seterr(**orig_err_settings)
+            self.event_distributor.stop_sequencer(self.name)
             self.running = False
 
         duration = time.perf_counter() - start
@@ -231,7 +236,6 @@ class Q1Core:
     def _stop(self, exit_code: int = 0):
         # update clock and check RT time for underflows
         self.clock.schedule_rt(self.renderer.time)
-        self.event_distributor.stop_sequencer(self.name)
         raise Halt('stop instruction', exit_code=exit_code)
 
     def _nop(self):
@@ -534,6 +538,9 @@ class Q1Core:
         # cast for unsigned register values
         self.renderer.set_awg_offs(np.int16(offset0), np.int16(offset1))
 
+    def _set_scope_en(self, enable):
+        raise NotImplementedError("set_scope_en is not implemented")
+
     def _set_cond(self, enable, mask, op, else_wait):
         self.renderer.set_cond(enable, mask, op, else_wait)
 
@@ -652,6 +659,7 @@ class Q1Core:
     # ---- Simulator commands ----
 
     def _log(self, msg, reg, options):
+        options = options or ""
         if 'R' in options and reg.startswith('R'):
             reg_nr = int(reg[1:])
             value = self.R[reg_nr]

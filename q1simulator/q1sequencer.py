@@ -195,7 +195,7 @@ class Q1Sequencer(InstrumentChannel, Task):
 
     def _set_nco_freq(self, value):
         logger.info(f'{self.name}: nco_freq={value}')
-        self.rt_renderer.nco_frequency = value
+        self.rt_renderer.set_nco_frequency(value)
 
     def _set_demod_en_acq(self, value):
         logger.debug(f'{self.name}: demod_en_acq={value}')
@@ -409,51 +409,47 @@ class Q1Sequencer(InstrumentChannel, Task):
             self.rt_renderer.set_mock_data(bin_num, data)
 
     def get_sequencer_status(self, timeout: int = 0, timeout_poll_res: float = 0.02):
-        try:
-            if self.q1core.running:
-                # if running, sleep a bit to avoid that polling tasks claims the CPU core.
-                time.sleep(0.001)
-            if timeout:
-                expiration_time = time.perf_counter() + timeout * 60.0
-                while not self._scheduler.join_sequencer(self.name):
-                    if time.perf_counter() > expiration_time:
-                        raise TimeoutError(f"Sequencer {self.name}")
-                    time.sleep(timeout_poll_res)
-            else:
-                self._scheduler.join_sequencer(self.name)
+        if self.q1core.running:
+            # if running, sleep a bit to avoid that polling tasks claims the CPU core.
+            time.sleep(0.001)
+        if timeout:
+            expiration_time = time.perf_counter() + timeout * 60.0
+            while not self._scheduler.join_sequencer(self.name):
+                if time.perf_counter() > expiration_time:
+                    raise TimeoutError(f"Sequencer {self.name}")
+                time.sleep(timeout_poll_res)
+        else:
+            self._scheduler.join_sequencer(self.name)
 
-            info_flags = []
-            warn_flags = []
-            error_flags = [
-                SequencerStatusFlags[flag.replace(' ', '_')]
-                for flag in self.q1core.errors | self.rt_renderer.errors
-                ]
-            log = []
-            if self._is_qrm:
-                info_flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
+        info_flags = []
+        warn_flags = []
+        error_flags = [
+            SequencerStatusFlags[flag.replace(' ', '_')]
+            for flag in self.q1core.errors | self.rt_renderer.errors
+            ]
+        log = []
+        if self._is_qrm:
+            info_flags.append(SequencerStatusFlags.ACQ_BINNING_DONE)
 
-            if qblox_version >= Version("1.2.0"):
-                return SequencerStatus(
-                    SequencerStatuses.OKAY,
-                    SequencerStates[self.run_state],
-                    int(self.q1core.exit_code),
-                    info_flags,
-                    warn_flags,
-                    error_flags,
-                    log,
-                )
-            else:
-                return SequencerStatus(
-                    SequencerStatuses.OKAY,
-                    SequencerStates[self.run_state],
-                    info_flags,
-                    warn_flags,
-                    error_flags,
-                    log,
-                )
-        except KeyboardInterrupt:
-            self._event_distributor.abort()
-            raise
+        if qblox_version >= Version("1.2.0"):
+            return SequencerStatus(
+                SequencerStatuses.OKAY,
+                SequencerStates[self.run_state],
+                int(self.q1core.exit_code),
+                info_flags,
+                warn_flags,
+                error_flags,
+                log,
+            )
+        else:
+            return SequencerStatus(
+                SequencerStatuses.OKAY,
+                SequencerStates[self.run_state],
+                info_flags,
+                warn_flags,
+                error_flags,
+                log,
+            )
 
     def get_acquisition_status(self, timeout: int = 0, timeout_poll_res: float = 0.02, check_seq_state: bool = True):
         if not self._is_qrm:
@@ -511,7 +507,6 @@ class Q1Sequencer(InstrumentChannel, Task):
     def stop_sequencer(self):
         if self.run_state in ["RUNNING", "ARMED"]:
             self.abort()
-        self._event_distributor.set_sequencer_sync_en(self.name, False)
         self.run_state = "STOPPED"
 
     def run(self):
@@ -697,9 +692,6 @@ class Q1Sequencer(InstrumentChannel, Task):
 
     def get_used_triggers(self):
         return self.q1core.get_used_triggers()
-
-    def get_acq_trigger_events(self):
-        return self.rt_renderer.acq_trigger_events
 
     def set_trigger_events(self, events):
         self._trigger_events = events

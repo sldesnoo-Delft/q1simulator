@@ -2,7 +2,7 @@ import sys
 from dataclasses import dataclass
 
 import matplotlib.pyplot as pt
-from qcodes import Instrument
+from qcodes.instrument import Instrument
 
 from .q1simulator import Q1Simulator
 

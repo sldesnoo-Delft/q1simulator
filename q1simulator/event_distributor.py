@@ -53,7 +53,7 @@ class SequencerQueue:
 
     def _append(self, event: BaseEvent):
         self._queue.append(event)
-        self._queue.sort(key=lambda e: (e.event_time, e.event_type))
+        self._queue.sort(key=lambda e: (e.event_time, e.event_type.value))
 
     def get_event(self, max_time: int) -> BaseEvent | None:
         if len(self._queue) == 0:
@@ -94,7 +94,6 @@ class EventDistributor:
         self._sequencer_queue: dict[str, SequencerQueue] = {}
         self._abort_sequencers: set[str] = set()
         self._min_time: int = 0
-        self._abort = False
 
     def clear_router(self, sequencer_name: str | None = None):
         if sequencer_name is None:
@@ -104,7 +103,8 @@ class EventDistributor:
         else:
             for target in self._event_targets.values():
                 target.discard(sequencer_name)
-            self._sequencer_queue[sequencer_name].clear()
+            if sequencer_name in self._sequencer_queue:
+                self._sequencer_queue[sequencer_name].clear()
 
     def set_route(self, event_id: int, sequencer_name: str):
         self._event_targets[event_id].add(sequencer_name)
@@ -159,26 +159,11 @@ class EventDistributor:
         The sequencer time should be set regularly by running sequencers to prevent starvation of other sequencers.
         Update interval could be something like once every 10 instructions.
         """
-        if self._abort:
-            logger.info(f"Abort {sequencer_name}")
-            raise KeyboardInterrupt(f"Aborting {sequencer_name}")
         self._update_sequencer_time(sequencer_name, rt_time=rt_time)
 
-    def abort(self):
-        logger.info("Request abort ALL")
+    def _update_sequencer_time(self, sequencer_name: str, rt_time: int):
         with self._condition:
-            self._abort = True
-            self._condition.notify_all()
-        self._sync_barrier.abort()
-
-    def _update_sequencer_time(self, sequencer_name: str, /,
-                               rt_time: int | None = None,
-                               sys_time: int | None = None):
-        with self._condition:
-            if rt_time is not None:
-                self._sequencer_times[sequencer_name].update(rt_time=rt_time)
-            if sys_time is not None:
-                self._sequencer_times[sequencer_name].update(system_time=sys_time)
+            self._sequencer_times[sequencer_name].update(rt_time=rt_time)
             self._update_min_time()
             self._condition.notify_all()
 
@@ -193,13 +178,12 @@ class EventDistributor:
             wait = self._min_time < system_time
             if wait:
                 logger.info(f"Sequencer {sequencer_name} waits at sys:{system_time} ...")
-            while self._min_time < system_time and not self._abort and sequencer_name not in self._abort_sequencers:
+            while self._min_time < system_time and sequencer_name not in self._abort_sequencers:
                 self._condition.wait()
             if wait:
                 logger.info(f"Sequencer {sequencer_name} continues")
-            if self._abort or sequencer_name in self._abort_sequencers:
-                logger.info(f"Sequencer abort {sequencer_name} "
-                            f"({self._abort}, {sequencer_name in self._abort_sequencers})")
+            if sequencer_name in self._abort_sequencers:
+                logger.info(f"Sequencer abort {sequencer_name}")
 
     def get_event(self, sequencer_name: str, rt_time: int) -> FeedbackEvent | TriggerEvent | None:
         """
@@ -260,7 +244,7 @@ class EventDistributor:
             latency = 4*(length-1) + type_latency
             t_delivery = sys_time + latency
             sequencer_queue = self._sequencer_queue[sequencer_name]
-            sequencer_queue.add_feedback_event(t_delivery, event_id, data)
+            sequencer_queue.add_feedback_event(t_delivery, event_id, data, write_combine)
         else:
             # TODO: distinct intra-cast / multi-cast
             # Bus occupancy is currently ignored!
@@ -287,7 +271,7 @@ class EventDistributor:
         print("Sequencer", sequencer_name)
         print(self._sequencer_times[sequencer_name])
         print(self._sequencer_queue[sequencer_name]._queue)
-        print("Abort", self._abort, sequencer_name in self._abort_sequencers)
+        print("Abort", sequencer_name in self._abort_sequencers)
 
 
 class SequencerTime:
@@ -299,9 +283,8 @@ class SequencerTime:
         self._offset = offset
         self._rt_time: int = 0
 
-    def update(self, /, rt_time: int | None = None):
-        if rt_time is not None:
-            self._rt_time = rt_time
+    def update(self, rt_time: int):
+        self._rt_time = rt_time
 
     @property
     def system_time(self):

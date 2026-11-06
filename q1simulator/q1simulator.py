@@ -85,9 +85,6 @@ class Q1Simulator(Q1Module):
             [],
             SystemStatusSlotFlags({}))
 
-    def clear_router(self):
-        self._event_distributor.clear_router()
-
     def set_cmm_route(self,
                       id_: int | list[int],
                       targets: Iterable[Q1Module | Q1Sequencer]
@@ -102,13 +99,13 @@ class Q1Simulator(Q1Module):
                 sequencer_names.append(target.name)
         for event_id in ids:
             for name in sequencer_names:
-                self._event_distributor.set_route(event_id, name)
+                self._scheduler.event_distributor.set_route(event_id, name)
 
     def set_broad_cast(self,
                        id_: int | list[int],
                        ) -> None:
         # There is only 1 module in Q1Simulator.
-        self.set_cmm_route(id_, self)
+        self.set_cmm_route(id_, [self])
 
     def _log_set(self, name, value):
         logger.info(f'{self.name}: {name}={value}')
