@@ -108,7 +108,7 @@ class Q1Plotter:
                     logger.warning(f"unknown module type {module.module_type} in slot {slot}")
                     continue
                 if module.is_rf_type:
-                    sim_type += "_RF"
+                    sim_type += "-RF"
                 modules[slot] = sim_type
         return modules
 
