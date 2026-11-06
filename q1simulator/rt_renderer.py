@@ -633,7 +633,7 @@ class Renderer:
             nco = np.exp(1j*phase)
             # Multiplication factor as specified when modulating.
             # Note: also in real mode applied to both paths.
-            path = (path * np.sqrt(.5)).astype(int)
+            path = (path * np.sqrt(.5)).astype(np.int16)
             if not self.real_mode_en:
                 data0 = nco.real*path[0] - nco.imag*path[1]
                 if self.mixer_phase_offset_degree != 0.0:
