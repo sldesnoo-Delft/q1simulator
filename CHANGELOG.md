@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to Q1Simulator will be documented in this file.
 
+## \[1.4.1] - 2026-11-09
+
+- Fix Q1Plotter module types QCM-RF and QRM-RF.
+- Changed directory structure to */src/*
+
 ## \[1.4.0] - 2026-11-06
 
 - Update to qblox-instruments v1.4.1
