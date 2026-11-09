@@ -41,10 +41,15 @@ Repository = "https://github.com/sldesnoo-Delft/q1simulator"
 Changelog = "https://github.com/sldesnoo-Delft/q1simulator/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["q1simulator*"]
 
 [tool.setuptools.package-data]
 q1simulator = ["**/*.hdf5"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = ["test_*.py"]
 
 [tool.tbump]
 # Uncomment this if your project is hosted on GitHub:
@@ -76,7 +81,7 @@ src = "pyproject.toml"
 search = 'version = "{current_version}" # tbump: version'
 
 [[tool.tbump.file]]
-src = "q1simulator/__init__.py"
+src = "src/q1simulator/__init__.py"
 search = '__version__ = "{current_version}"'
 
 # You can specify a list of commands to

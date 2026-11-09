@@ -1,4 +1,4 @@
-/q1simulator.egg-info
+*.egg-info/
 __pycache__
 /build
 /dist
